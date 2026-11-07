@@ -1,0 +1,109 @@
+{
+  "id": "github_repo",
+  "name": "GitHub Open Source Repository",
+  "description": "Developer repository card with GitHub icon, repository title, language and star metric badges",
+  "width": 1200,
+  "height": 630,
+  "background": {
+    "type": "gradient",
+    "direction": "to-bottom-right",
+    "stops": [
+      { "offset": 0.0, "color": "#0d1117" },
+      { "offset": 1.0, "color": "#161b22" }
+    ]
+  },
+  "elements": [
+    {
+      "type": "icon",
+      "icon": "github",
+      "size": 48,
+      "color": "#f0f6fc",
+      "x": 80,
+      "y": 70
+    },
+    {
+      "type": "text",
+      "field": "author",
+      "default": "alexandrmotologa /",
+      "font": "JetBrainsMono-Medium",
+      "font_size": 28,
+      "color": "#8b949e",
+      "x": 144,
+      "y": 78
+    },
+    {
+      "type": "text",
+      "field": "title",
+      "default": "ogcraft",
+      "font": "JetBrainsMono-Bold",
+      "font_size": 36,
+      "color": "#58a6ff",
+      "x": 480,
+      "y": 74
+    },
+    {
+      "type": "text",
+      "field": "description",
+      "default": "Self-hosted dynamic OpenGraph image and social preview card generator in Go and React 19.",
+      "font": "Inter-SemiBold",
+      "font_size": 44,
+      "color": "#f0f6fc",
+      "x": 80,
+      "y": 180,
+      "max_width": 1040,
+      "line_height": 1.3,
+      "max_lines": 3,
+      "fit_text": true
+    },
+    {
+      "type": "badge",
+      "field": "language",
+      "default": "Go 1.24",
+      "font": "JetBrainsMono-Medium",
+      "font_size": 20,
+      "color": "#00add8",
+      "background_color": "#00add822",
+      "border_color": "#00add866",
+      "border_width": 1,
+      "x": 80,
+      "y": 480,
+      "padding_x": 14,
+      "padding_y": 7,
+      "border_radius": 6
+    },
+    {
+      "type": "badge",
+      "field": "stars",
+      "default": "1.4k stars",
+      "icon": "star",
+      "font": "Inter-SemiBold",
+      "font_size": 20,
+      "color": "#e3b341",
+      "background_color": "#bb800922",
+      "border_color": "#bb800966",
+      "border_width": 1,
+      "x": 220,
+      "y": 480,
+      "padding_x": 14,
+      "padding_y": 7,
+      "border_radius": 6
+    },
+    {
+      "type": "badge",
+      "field": "license",
+      "default": "MIT License",
+      "icon": "check",
+      "font": "Inter-SemiBold",
+      "font_size": 20,
+      "color": "#3fb950",
+      "background_color": "#23863622",
+      "border_color": "#23863666",
+      "border_width": 1,
+      "x": 390,
+      "y": 480,
+      "padding_x": 14,
+      "padding_y": 7,
+      "border_radius": 6
+    }
+  ]
+}

@@ -1,0 +1,98 @@
+{
+  "id": "dark_tech",
+  "name": "Dark Tech and Developer",
+  "description": "High-contrast developer theme with category pill, title, author avatar and author handle",
+  "width": 1200,
+  "height": 630,
+  "background": {
+    "type": "gradient",
+    "direction": "to-bottom-right",
+    "stops": [
+      { "offset": 0.0, "color": "#090d16" },
+      { "offset": 1.0, "color": "#121a29" }
+    ]
+  },
+  "elements": [
+    {
+      "type": "badge",
+      "field": "tag",
+      "default": "SYSTEM ARCHITECTURE",
+      "font": "JetBrainsMono-Medium",
+      "font_size": 20,
+      "color": "#ffffff",
+      "background_color": "#238636",
+      "x": 80,
+      "y": 70,
+      "padding_x": 16,
+      "padding_y": 8,
+      "border_radius": 6
+    },
+    {
+      "type": "text",
+      "field": "title",
+      "default": "Scaling Real-Time Vector Engines to 10M Concurrent Sessions",
+      "font": "Inter-Bold",
+      "font_size": 56,
+      "color": "#f0f6fc",
+      "x": 80,
+      "y": 140,
+      "max_width": 1040,
+      "line_height": 1.25,
+      "max_lines": 3,
+      "fit_text": true
+    },
+    {
+      "type": "text",
+      "field": "description",
+      "default": "Zero-copy caching, SIMD font rasterization, and sub-15 millisecond response times.",
+      "font": "Inter-Regular",
+      "font_size": 28,
+      "color": "#8b949e",
+      "x": 80,
+      "y": 380,
+      "max_width": 1040,
+      "line_height": 1.3,
+      "max_lines": 2,
+      "fit_text": true
+    },
+    {
+      "type": "divider",
+      "x": 80,
+      "y": 480,
+      "width": 1040,
+      "height": 1,
+      "color": "#21262d"
+    },
+    {
+      "type": "avatar",
+      "field": "avatar",
+      "default": "https://avatars.githubusercontent.com/u/583231",
+      "x": 80,
+      "y": 510,
+      "size": 60,
+      "shape": "circle",
+      "border_color": "#30363d",
+      "border_width": 2
+    },
+    {
+      "type": "text",
+      "field": "author",
+      "default": "Alexandr Motologa",
+      "font": "Inter-SemiBold",
+      "font_size": 26,
+      "color": "#c9d1d9",
+      "x": 156,
+      "y": 516
+    },
+    {
+      "type": "text",
+      "field": "date",
+      "default": "Nov 7, 2026",
+      "font": "Inter-Regular",
+      "font_size": 22,
+      "color": "#8b949e",
+      "x": 156,
+      "y": 546
+    }
+  ]
+}

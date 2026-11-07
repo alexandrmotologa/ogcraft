@@ -1,0 +1,81 @@
+{
+  "id": "podcast_event",
+  "name": "Podcast and Event Preview",
+  "description": "Event and podcast episode layout featuring speaker avatar and event date",
+  "width": 1200,
+  "height": 630,
+  "background": {
+    "type": "gradient",
+    "direction": "to-bottom-right",
+    "stops": [
+      { "offset": 0.0, "color": "#111827" },
+      { "offset": 1.0, "color": "#030712" }
+    ]
+  },
+  "elements": [
+    {
+      "type": "badge",
+      "field": "tag",
+      "default": "EPISODE #42",
+      "font": "JetBrainsMono-Bold",
+      "font_size": 20,
+      "color": "#f97316",
+      "background_color": "#431407",
+      "x": 80,
+      "y": 80,
+      "padding_x": 16,
+      "padding_y": 8,
+      "border_radius": 6
+    },
+    {
+      "type": "text",
+      "field": "title",
+      "default": "Deep Dive into Go 1.24 Runtime Internals and Garbage Collector Tweaks",
+      "font": "Inter-Bold",
+      "font_size": 54,
+      "color": "#f9fafb",
+      "x": 80,
+      "y": 160,
+      "max_width": 1040,
+      "line_height": 1.25,
+      "max_lines": 3,
+      "fit_text": true
+    },
+    {
+      "type": "avatar",
+      "field": "avatar",
+      "default": "https://avatars.githubusercontent.com/u/583231",
+      "x": 80,
+      "y": 480,
+      "size": 72,
+      "shape": "circle",
+      "border_color": "#f97316",
+      "border_width": 2
+    },
+    {
+      "type": "text",
+      "field": "author",
+      "default": "Guest: Alexandr Motologa",
+      "font": "Inter-Bold",
+      "font_size": 28,
+      "color": "#ffffff",
+      "x": 172,
+      "y": 486
+    },
+    {
+      "type": "badge",
+      "field": "date",
+      "default": "Nov 12, 2026 • 45 mins",
+      "icon": "clock",
+      "font": "Inter-Regular",
+      "font_size": 18,
+      "color": "#9ca3af",
+      "background_color": "#1f2937",
+      "x": 172,
+      "y": 526,
+      "padding_x": 12,
+      "padding_y": 6,
+      "border_radius": 6
+    }
+  ]
+}

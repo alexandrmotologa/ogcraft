@@ -1,0 +1,94 @@
+{
+  "id": "minimal_light",
+  "name": "Minimal Editorial Light",
+  "description": "Clean Swiss-editorial style on off-white canvas with sharp typography",
+  "width": 1200,
+  "height": 630,
+  "background": {
+    "type": "solid",
+    "color": "#f8fafc"
+  },
+  "elements": [
+    {
+      "type": "badge",
+      "field": "tag",
+      "default": "ENGINEERING",
+      "font": "Inter-SemiBold",
+      "font_size": 18,
+      "color": "#1e40af",
+      "background_color": "#dbeafe",
+      "x": 90,
+      "y": 80,
+      "padding_x": 14,
+      "padding_y": 7,
+      "border_radius": 999
+    },
+    {
+      "type": "text",
+      "field": "title",
+      "default": "Writing Resilient Distributed Systems Without Framework Overhead",
+      "font": "Inter-Bold",
+      "font_size": 58,
+      "color": "#0f172a",
+      "x": 90,
+      "y": 160,
+      "max_width": 1020,
+      "line_height": 1.25,
+      "max_lines": 3,
+      "fit_text": true
+    },
+    {
+      "type": "text",
+      "field": "description",
+      "default": "Practical patterns for decoupling storage, memory limits, and thread boundaries.",
+      "font": "Inter-Regular",
+      "font_size": 28,
+      "color": "#475569",
+      "x": 90,
+      "y": 380,
+      "max_width": 1020,
+      "line_height": 1.3,
+      "max_lines": 2,
+      "fit_text": true
+    },
+    {
+      "type": "divider",
+      "x": 90,
+      "y": 480,
+      "width": 1020,
+      "height": 2,
+      "color": "#e2e8f0"
+    },
+    {
+      "type": "avatar",
+      "field": "avatar",
+      "default": "https://avatars.githubusercontent.com/u/583231",
+      "x": 90,
+      "y": 510,
+      "size": 56,
+      "shape": "circle",
+      "border_color": "#cbd5e1",
+      "border_width": 2
+    },
+    {
+      "type": "text",
+      "field": "author",
+      "default": "Alexandr Motologa",
+      "font": "Inter-SemiBold",
+      "font_size": 26,
+      "color": "#1e293b",
+      "x": 164,
+      "y": 516
+    },
+    {
+      "type": "text",
+      "field": "date",
+      "default": "mtlglabs.space",
+      "font": "Inter-Regular",
+      "font_size": 22,
+      "color": "#64748b",
+      "x": 164,
+      "y": 546
+    }
+  ]
+}

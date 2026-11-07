@@ -1,0 +1,101 @@
+{
+  "id": "glow_dev",
+  "name": "Cyber Glow Developer",
+  "description": "Deep space canvas with radial chromatic glow and glassmorphic card elements",
+  "width": 1200,
+  "height": 630,
+  "background": {
+    "type": "radial",
+    "center_x": 1050,
+    "center_y": 120,
+    "radius": 600,
+    "center_color": "#8b5cf644",
+    "outer_color": "#05070d"
+  },
+  "elements": [
+    {
+      "type": "container",
+      "x": 60,
+      "y": 50,
+      "width": 1080,
+      "height": 530,
+      "border_radius": 24,
+      "background_color": "#0d1322aa",
+      "border_color": "#1e293b",
+      "border_width": 1.5
+    },
+    {
+      "type": "badge",
+      "field": "tag",
+      "default": "DEEP DIVE",
+      "font": "JetBrainsMono-Bold",
+      "font_size": 20,
+      "color": "#ffffff",
+      "background_color": "#7c3aed",
+      "x": 110,
+      "y": 100,
+      "padding_x": 16,
+      "padding_y": 8,
+      "border_radius": 8
+    },
+    {
+      "type": "text",
+      "field": "title",
+      "default": "SIMD Vector Accelerators and Cache Lines in Memory-Constrained Daemons",
+      "font": "Inter-Bold",
+      "font_size": 52,
+      "color": "#f8fafc",
+      "x": 110,
+      "y": 170,
+      "max_width": 980,
+      "line_height": 1.25,
+      "max_lines": 3,
+      "fit_text": true
+    },
+    {
+      "type": "text",
+      "field": "description",
+      "default": "Bypassing GC pauses and optimizing memory layout for sub-millisecond throughput.",
+      "font": "Inter-Regular",
+      "font_size": 26,
+      "color": "#94a3b8",
+      "x": 110,
+      "y": 380,
+      "max_width": 980,
+      "line_height": 1.3,
+      "max_lines": 2,
+      "fit_text": true
+    },
+    {
+      "type": "avatar",
+      "field": "avatar",
+      "default": "https://avatars.githubusercontent.com/u/583231",
+      "x": 110,
+      "y": 480,
+      "size": 56,
+      "shape": "circle",
+      "border_color": "#8b5cf6",
+      "border_width": 2
+    },
+    {
+      "type": "text",
+      "field": "author",
+      "default": "Alexandr Motologa",
+      "font": "Inter-SemiBold",
+      "font_size": 26,
+      "color": "#e2e8f0",
+      "x": 184,
+      "y": 486
+    },
+    {
+      "type": "text",
+      "field": "date",
+      "default": "7 min read",
+      "font": "JetBrainsMono-Medium",
+      "font_size": 20,
+      "color": "#a78bfa",
+      "x": 184,
+      "y": 516
+    }
+  ]
+}
