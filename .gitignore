@@ -1,0 +1,24 @@
+# Binaries
+ogcraft
+ogcraft.exe
+bin/
+dist/
+
+# Dependencies
+vendor/
+node_modules/
+
+# Web build output
+web/dist/
+
+# Runtime data & cache
+data/
+cache/
+*.log
+
+# OS & Editor
+.DS_Store
+Thumbs.db
+.vscode/
+.idea/
+*.swp
