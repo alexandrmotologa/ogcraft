@@ -1,8 +1,15 @@
-# ogcraft
+<p align="center">
+  <img src="docs/images/logo.png?raw=true" alt="ogcraft Logo" width="130" style="border-radius: 24px;" />
+</p>
+<h1 align="center">ogcraft</h1>
+<p align="center">
+  <strong>Self-hosted dynamic OpenGraph image and social preview card generator in Go and React 19.</strong><br />
+  Generates 1200x630 pixel social cards from URL query parameters in under 15ms with two-tier caching and sub-40MB memory footprint.
+</p>
 
-Self-hosted dynamic OpenGraph image and social preview card generator in Go and React 19.
-
-Generates 1200x630 pixel social cards from URL query parameters in under 15ms with two-tier caching and sub-40MB memory footprint.
+<p align="center">
+  <img src="docs/images/ogcraft_demo.gif?raw=true" alt="ogcraft Studio and Social Feed Simulator Demo" width="100%" />
+</p>
 
 ---
 
@@ -112,6 +119,31 @@ docker run -d \
   --name ogcraft \
   ghcr.io/alexandrmotologa/ogcraft:latest
 ```
+
+---
+
+## Visual Studio & Social Previews
+
+### Interactive Canvas Editor
+The embedded React 19 studio provides live element dragging, real-time coordinate inspection, typography adjustment, and URL parameter simulation.
+
+<p align="center">
+  <img src="docs/images/ogcraft_dashboard.png?raw=true" alt="ogcraft Interactive Canvas Editor" width="100%" />
+</p>
+
+### Social Feed Simulator
+Preview how generated OpenGraph preview cards display across Twitter / X, LinkedIn, Discord, and Slack feed cards before deploying to production.
+
+<p align="center">
+  <img src="docs/images/ogcraft_social_simulator.png?raw=true" alt="ogcraft Social Feed Simulator" width="100%" />
+</p>
+
+### Responsive Mobile Interface
+The design studio adapts cleanly to tablets and smartphones with a dedicated bottom navigation bar, touch-friendly parameter controls, and responsive preview scaling.
+
+<p align="center">
+  <img src="docs/images/ogcraft_mobile.png?raw=true" alt="ogcraft Responsive Mobile Interface" width="380" />
+</p>
 
 ---
 

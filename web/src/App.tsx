@@ -24,6 +24,8 @@ import {
   Download,
   Eye,
   LayoutTemplate,
+  Layers,
+  Sliders,
 } from 'lucide-react';
 
 export const App: React.FC = () => {
@@ -38,6 +40,9 @@ export const App: React.FC = () => {
 
   // View Mode: 'canvas' or 'social-feed'
   const [viewMode, setViewMode] = useState<'canvas' | 'social-feed'>('canvas');
+
+  // Mobile Navigation Tab: 'templates' | 'canvas' | 'inspector' | 'feeds'
+  const [mobileTab, setMobileTab] = useState<'templates' | 'canvas' | 'inspector' | 'feeds'>('canvas');
 
   // Modal
   const [isImportModalOpen, setIsImportModalOpen] = useState(false);
@@ -335,113 +340,129 @@ export const App: React.FC = () => {
       </header>
 
       {/* Main Studio Body */}
-      <div className="flex-1 flex overflow-hidden">
+      <div className="flex-1 flex overflow-hidden relative">
         {/* Left: Template Selector */}
-        <TemplateSelector
-          templates={templateSummaries}
-          activeId={activeTemplateId}
-          onSelect={(id) => setActiveTemplateId(id)}
-          onCreateNew={() => {
-            const newId = `custom_${Date.now().toString().slice(-4)}`;
-            const tmpl: Template = {
-              id: newId,
-              name: 'New Custom Template',
-              width: 1200,
-              height: 630,
-              background: {
-                type: 'gradient',
-                direction: 'to-bottom-right',
-                pattern: 'dots',
-                stops: [
-                  { offset: 0, color: '#090d16' },
-                  { offset: 1, color: '#161e2e' },
+        <div className={`${mobileTab === 'templates' ? 'flex' : 'hidden'} lg:flex h-full w-full lg:w-72 flex-shrink-0`}>
+          <TemplateSelector
+            templates={templateSummaries}
+            activeId={activeTemplateId}
+            onSelect={(id) => {
+              setActiveTemplateId(id);
+              if (window.innerWidth < 1024) {
+                setMobileTab('canvas');
+              }
+            }}
+            onCreateNew={() => {
+              const newId = `custom_${Date.now().toString().slice(-4)}`;
+              const tmpl: Template = {
+                id: newId,
+                name: 'New Custom Template',
+                width: 1200,
+                height: 630,
+                background: {
+                  type: 'gradient',
+                  direction: 'to-bottom-right',
+                  pattern: 'dots',
+                  stops: [
+                    { offset: 0, color: '#090d16' },
+                    { offset: 1, color: '#161e2e' },
+                  ],
+                },
+                elements: [
+                  {
+                    type: 'badge',
+                    field: 'tag',
+                    default: 'CUSTOM',
+                    font: 'JetBrainsMono-Medium',
+                    font_size: 18,
+                    color: '#ffffff',
+                    background_color: '#2563eb',
+                    x: 80,
+                    y: 80,
+                    padding_x: 14,
+                    padding_y: 6,
+                    border_radius: 6,
+                  },
+                  {
+                    type: 'text',
+                    field: 'title',
+                    default: 'Your Custom Headline Here',
+                    font: 'Inter-Bold',
+                    font_size: 54,
+                    color: '#f8fafc',
+                    x: 80,
+                    y: 160,
+                    max_width: 1040,
+                    line_height: 1.25,
+                    max_lines: 3,
+                    fit_text: true,
+                  },
                 ],
-              },
-              elements: [
-                {
-                  type: 'badge',
-                  field: 'tag',
-                  default: 'CUSTOM',
-                  font: 'JetBrainsMono-Medium',
-                  font_size: 18,
-                  color: '#ffffff',
-                  background_color: '#2563eb',
-                  x: 80,
-                  y: 80,
-                  padding_x: 14,
-                  padding_y: 6,
-                  border_radius: 6,
-                },
-                {
-                  type: 'text',
-                  field: 'title',
-                  default: 'Your Custom Headline Here',
-                  font: 'Inter-Bold',
-                  font_size: 54,
-                  color: '#f8fafc',
-                  x: 80,
-                  y: 160,
-                  max_width: 1040,
-                  line_height: 1.25,
-                  max_lines: 3,
-                  fit_text: true,
-                },
-              ],
-            };
-            handleUpdateTemplate(tmpl);
-            setActiveTemplateId(newId);
-          }}
-          onDelete={handleDeleteCustomTemplate}
-        />
+              };
+              handleUpdateTemplate(tmpl);
+              setActiveTemplateId(newId);
+              if (window.innerWidth < 1024) {
+                setMobileTab('canvas');
+              }
+            }}
+            onDelete={handleDeleteCustomTemplate}
+          />
+        </div>
 
         {/* Center Viewport */}
         {activeTemplate ? (
-          viewMode === 'canvas' ? (
-            <div className="flex-1 flex flex-col h-full overflow-hidden">
-              <CanvasPreview
+          <div
+            className={`${
+              mobileTab === 'canvas' || mobileTab === 'feeds' ? 'flex' : 'hidden'
+            } lg:flex flex-1 flex-col h-full overflow-hidden`}
+          >
+            {viewMode === 'canvas' && mobileTab !== 'feeds' ? (
+              <div className="flex-1 flex flex-col h-full overflow-hidden">
+                <CanvasPreview
+                  template={activeTemplate}
+                  previewUrl={previewUrl}
+                  loading={loading}
+                  renderTime={renderTime}
+                  selectedElementIndex={selectedElementIndex}
+                  onSelectElement={setSelectedElementIndex}
+                  onUpdateElement={(idx, updated) => {
+                    const nextElements = [...activeTemplate.elements];
+                    nextElements[idx] = updated;
+                    handleUpdateTemplate({
+                      ...activeTemplate,
+                      elements: nextElements,
+                    });
+                  }}
+                  onRefresh={() => triggerRender(activeTemplate, params)}
+                />
+
+                {/* Bottom Controls: Simulator & Exporter */}
+                <div className="flex-shrink-0 flex flex-col max-h-72 overflow-y-auto">
+                  <ParamTester
+                    template={activeTemplate}
+                    params={params}
+                    onChangeParam={handleParamChange}
+                    onResetParams={() => {
+                      const initial: Record<string, string> = {};
+                      for (const el of activeTemplate.elements) {
+                        if (el.field && el.default) {
+                          initial[el.field] = el.default;
+                        }
+                      }
+                      setParams(initial);
+                    }}
+                  />
+                  <CodeExporter template={activeTemplate} params={params} />
+                </div>
+              </div>
+            ) : (
+              <SocialFeedSimulator
                 template={activeTemplate}
                 previewUrl={previewUrl}
-                loading={loading}
-                renderTime={renderTime}
-                selectedElementIndex={selectedElementIndex}
-                onSelectElement={setSelectedElementIndex}
-                onUpdateElement={(idx, updated) => {
-                  const nextElements = [...activeTemplate.elements];
-                  nextElements[idx] = updated;
-                  handleUpdateTemplate({
-                    ...activeTemplate,
-                    elements: nextElements,
-                  });
-                }}
-                onRefresh={() => triggerRender(activeTemplate, params)}
+                params={params}
               />
-
-              {/* Bottom Controls: Simulator & Exporter */}
-              <div className="flex-shrink-0 flex flex-col max-h-72 overflow-y-auto">
-                <ParamTester
-                  template={activeTemplate}
-                  params={params}
-                  onChangeParam={handleParamChange}
-                  onResetParams={() => {
-                    const initial: Record<string, string> = {};
-                    for (const el of activeTemplate.elements) {
-                      if (el.field && el.default) {
-                        initial[el.field] = el.default;
-                      }
-                    }
-                    setParams(initial);
-                  }}
-                />
-                <CodeExporter template={activeTemplate} params={params} />
-              </div>
-            </div>
-          ) : (
-            <SocialFeedSimulator
-              template={activeTemplate}
-              previewUrl={previewUrl}
-              params={params}
-            />
-          )
+            )}
+          </div>
         ) : (
           <div className="flex-1 flex items-center justify-center text-slate-500 font-mono text-sm">
             Loading template...
@@ -449,15 +470,78 @@ export const App: React.FC = () => {
         )}
 
         {/* Right Inspector */}
-        {activeTemplate && viewMode === 'canvas' && (
-          <ElementInspector
-            template={activeTemplate}
-            selectedElementIndex={selectedElementIndex}
-            onUpdateTemplate={handleUpdateTemplate}
-            onSelectElement={setSelectedElementIndex}
-          />
+        {activeTemplate && (
+          <div
+            className={`${
+              mobileTab === 'inspector' ? 'flex' : 'hidden'
+            } ${viewMode === 'canvas' ? 'lg:flex' : 'lg:hidden'} h-full w-full lg:w-80 flex-shrink-0`}
+          >
+            <ElementInspector
+              template={activeTemplate}
+              selectedElementIndex={selectedElementIndex}
+              onUpdateTemplate={handleUpdateTemplate}
+              onSelectElement={setSelectedElementIndex}
+            />
+          </div>
         )}
       </div>
+
+      {/* Mobile Bottom Navigation Tab Bar */}
+      <nav className="lg:hidden h-14 bg-[#0c121e] border-t border-[#1a2333] px-2 flex items-center justify-around flex-shrink-0 z-30">
+        <button
+          onClick={() => setMobileTab('templates')}
+          className={`flex flex-col items-center justify-center gap-1 flex-1 py-1 rounded-lg text-[10px] font-medium transition ${
+            mobileTab === 'templates'
+              ? 'text-sky-400 bg-sky-500/10 font-bold'
+              : 'text-slate-400 hover:text-slate-200'
+          }`}
+        >
+          <LayoutTemplate size={16} />
+          <span>Templates</span>
+        </button>
+        <button
+          onClick={() => {
+            setMobileTab('canvas');
+            setViewMode('canvas');
+          }}
+          className={`flex flex-col items-center justify-center gap-1 flex-1 py-1 rounded-lg text-[10px] font-medium transition ${
+            mobileTab === 'canvas' && viewMode === 'canvas'
+              ? 'text-sky-400 bg-sky-500/10 font-bold'
+              : 'text-slate-400 hover:text-slate-200'
+          }`}
+        >
+          <Layers size={16} />
+          <span>Canvas</span>
+        </button>
+        <button
+          onClick={() => {
+            setMobileTab('inspector');
+            setViewMode('canvas');
+          }}
+          className={`flex flex-col items-center justify-center gap-1 flex-1 py-1 rounded-lg text-[10px] font-medium transition ${
+            mobileTab === 'inspector'
+              ? 'text-sky-400 bg-sky-500/10 font-bold'
+              : 'text-slate-400 hover:text-slate-200'
+          }`}
+        >
+          <Sliders size={16} />
+          <span>Inspector</span>
+        </button>
+        <button
+          onClick={() => {
+            setMobileTab('feeds');
+            setViewMode('social-feed');
+          }}
+          className={`flex flex-col items-center justify-center gap-1 flex-1 py-1 rounded-lg text-[10px] font-medium transition ${
+            mobileTab === 'feeds' || viewMode === 'social-feed'
+              ? 'text-sky-400 bg-sky-500/10 font-bold'
+              : 'text-slate-400 hover:text-slate-200'
+          }`}
+        >
+          <Eye size={16} />
+          <span>Feeds</span>
+        </button>
+      </nav>
 
       {/* Import Modal */}
       <TemplateImportModal

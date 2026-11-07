@@ -18,7 +18,7 @@ export const TemplateSelector: React.FC<TemplateSelectorProps> = ({
   onDelete,
 }) => {
   return (
-    <div className="flex flex-col h-full bg-[#0c121e] border-r border-[#1a2333] w-72 flex-shrink-0">
+    <div className="flex flex-col h-full bg-[#0c121e] border-r border-[#1a2333] w-full lg:w-72 flex-shrink-0">
       {/* Header */}
       <div className="flex items-center justify-between p-4 border-b border-[#1a2333]">
         <div className="flex items-center gap-2">

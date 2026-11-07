@@ -182,7 +182,7 @@ export const ElementInspector: React.FC<ElementInspectorProps> = ({
   };
 
   return (
-    <div className="flex flex-col h-full bg-[#0c121e] border-l border-[#1a2333] w-80 flex-shrink-0 overflow-y-auto">
+    <div className="flex flex-col h-full bg-[#0c121e] border-l border-[#1a2333] w-full lg:w-80 flex-shrink-0 overflow-y-auto">
       {/* Top Header */}
       <div className="flex items-center justify-between p-4 border-b border-[#1a2333]">
         <div className="flex items-center gap-2">
