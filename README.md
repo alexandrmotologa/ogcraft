@@ -8,14 +8,18 @@ Generates 1200x630 pixel social cards from URL query parameters in under 15ms wi
 
 ## Highlights
 
-- **Fast native rendering**: Pure Go vector graphics pipeline rendering 1200x630 cards in 8 to 15 milliseconds.
-- **Low memory consumption**: Under 40MB RAM under sustained traffic. Zero Chromium or headless browser dependencies.
+- **Fast native rendering**: Pure Go vector graphics pipeline rendering cards in 8 to 15 milliseconds.
+- **Multiple output formats**: Native support for **WebP** (sub-25KB), **PNG**, and **JPEG** with automatic content negotiation.
+- **Multi-aspect presets**: Standard OpenGraph (1200x630), Square (800x800 for Twitter/Instagram), and Vertical Story (1080x1920).
 - **Two-tier cache engine**: Thread-safe in-memory LRU (L1) backed by content-hashed disk cache (L2) with RFC 9111 ETag validation.
-- **Embedded typography**: TrueType fonts embedded directly in the binary (Inter Regular, SemiBold, Bold, and JetBrains Mono Medium).
+- **Embedded typography**: TrueType fonts embedded directly in the binary (Inter Regular, SemiBold, Bold, and JetBrains Mono Medium, Bold).
 - **Dynamic FitText**: Automatic multi-line wrapping and downscaling so long titles fit without clipping.
-- **Visual card designer**: Drag-and-drop React 19 cockpit embedded inside the Go executable.
+- **Advanced visual elements**: Terminal code windows with macOS controls and syntax coloring, metric cards with progress bars, vector badges, and pattern overlays (dots grid, tech lines).
+- **Dynamic palette overrides**: Change colors on the fly via URL query parameters (`?bg=#0f172a`, `?accent=#38bdf8`, `?theme=light`).
+- **Visual card designer**: Drag-and-drop React 19 cockpit with a live **Social Feed Simulator** (preview on Twitter/X, LinkedIn, Discord, Slack), JSON import/export, and undo/redo history.
+- **Batch SSG CLI**: Pre-render hundreds of cards from JSON or CSV files in seconds for static site generation.
+- **Production observability**: Prometheus metrics endpoint (`/metrics`) and authenticated cache purge API (`POST /v1/cache/purge`).
 - **SSRF protection**: Remote avatar and logo fetching guards against private IP ranges and internal network requests.
-- **HMAC security**: Optional URL signature checking prevents cache poisoning and parameter tampering on public endpoints.
 - **Single static binary**: Ships as a standalone executable under 30MB with zero external runtime requirements.
 
 ---
@@ -41,14 +45,21 @@ Open `http://localhost:8080` in your browser to access the visual designer cockp
 ### 2. Request an Image
 
 ```bash
+# WebP format (sub-25KB)
+curl -o card.webp "http://localhost:8080/v1/cards/dark_tech.webp?title=High+Performance+Go+Services&author=Alexandr&tag=Go"
+
+# Standard PNG
 curl -o card.png "http://localhost:8080/v1/cards/dark_tech.png?title=High+Performance+Go+Services&author=Alexandr&tag=Go"
+
+# Square aspect ratio for Twitter / Instagram
+curl -o square.png "http://localhost:8080/v1/cards/minimal_light.png?aspect=square&title=Square+Post"
 ```
 
 ---
 
 ## CLI Usage
 
-`ogcraft` can run as a daemon or render images directly from the command line:
+`ogcraft` can run as an HTTP daemon, render one-shot images directly, or batch pre-render collections for static site generators:
 
 ```bash
 # Start HTTP daemon on custom port
@@ -56,10 +67,17 @@ ogcraft serve --port 3000 --cache-dir /var/cache/ogcraft
 
 # Render single card to disk without running server
 ogcraft render --template dark_tech \
+  --format webp \
   --param title="Building Reliable Systems" \
   --param author="Alexandr Motologa" \
   --param tag="Architecture" \
-  --output card.png
+  --output card.webp
+
+# Batch pre-render social cards for static site deployment (SSG)
+ogcraft batch --input posts.json \
+  --template dark_tech \
+  --format webp \
+  --out-dir ./dist/og
 
 # Print version and build information
 ogcraft version
@@ -95,13 +113,6 @@ docker run -d \
   ghcr.io/alexandrmotologa/ogcraft:latest
 ```
 
-Or build the local container:
-
-```bash
-docker build -t ogcraft .
-docker run -p 8080:8080 ogcraft
-```
-
 ---
 
 ## Documentation
@@ -115,22 +126,23 @@ docker run -p 8080:8080 ogcraft
 ## Architecture Overview
 
 ```
-URL Query Parameters ──► HMAC Verification ──► L1 Memory LRU ──► [HIT: 0.2ms]
+URL Query Parameters ──► HMAC Verification ──► L1 Memory LRU ──► [HIT: 0.1ms]
                                                      │
                                                   [MISS]
                                                      ▼
-                                              L2 Disk Cache  ──► [HIT: 1.8ms]
+                                              L2 Disk Cache  ──► [HIT: 1.5ms]
                                                      │
                                                   [MISS]
                                                      ▼
                                             Go 2D Vector Engine
                                             - Text Wrap & FitText
-                                            - TrueType Fonts
-                                            - SVG & Shapes
+                                            - Code Windows & Syntax
+                                            - Metric & Rating Cards
+                                            - Pattern Overlays (Dots/Grid)
                                             - SSRF Safe Avatars
                                                      │
                                                      ▼
-                                             Fast PNG Encoder ──► [11.2ms]
+                                     WebP / PNG / JPEG Fast Encoder ──► [11.2ms]
 ```
 
 ---

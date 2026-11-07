@@ -34,6 +34,7 @@ type Server struct {
 type RenderPayload struct {
 	Template templates.Template `json:"template"`
 	Params   map[string]string  `json:"params"`
+	Format   string             `json:"format,omitempty"`
 }
 
 // NewServer creates a new API Server instance.
@@ -58,7 +59,6 @@ func (s *Server) Router() *chi.Mux {
 func (s *Server) setupRoutes(webFS fs.FS) {
 	r := s.router
 
-	// Middleware
 	r.Use(middleware.RequestID)
 	r.Use(middleware.RealIP)
 	r.Use(middleware.Logger)
@@ -75,19 +75,22 @@ func (s *Server) setupRoutes(webFS fs.FS) {
 	rl := newRateLimiter(s.cfg.RateLimit)
 	r.Use(RateLimitMiddleware(rl))
 
-	// Health and diagnostics
+	// Health and Prometheus diagnostics
 	r.Get("/health", s.handleHealth)
+	r.Get("/metrics", s.handlePrometheusMetrics)
 
 	// API v1 routes
 	r.Route("/v1", func(r chi.Router) {
 		r.Get("/cards/{template}", s.handleRenderCard)
-		r.Get("/cards/{template}.png", s.handleRenderCard)
 		r.Post("/render", s.handleLiveRender)
 
 		r.Get("/templates", s.handleListTemplates)
 		r.Get("/templates/{id}", s.handleGetTemplate)
 		r.Post("/templates", s.handleSaveTemplate)
 		r.Delete("/templates/{id}", s.handleDeleteTemplate)
+
+		// Cache maintenance
+		r.Post("/cache/purge", s.handleCachePurge)
 	})
 
 	// Static frontend
@@ -101,9 +104,29 @@ func (s *Server) setupRoutes(webFS fs.FS) {
 
 func (s *Server) handleRenderCard(w http.ResponseWriter, r *http.Request) {
 	templateParam := chi.URLParam(r, "template")
-	templateID := strings.TrimSuffix(templateParam, ".png")
 
-	// 1. Extract query params
+	format := "png"
+	templateID := templateParam
+
+	switch {
+	case strings.HasSuffix(templateParam, ".webp"):
+		format = "webp"
+		templateID = strings.TrimSuffix(templateParam, ".webp")
+	case strings.HasSuffix(templateParam, ".jpeg"):
+		format = "jpeg"
+		templateID = strings.TrimSuffix(templateParam, ".jpeg")
+	case strings.HasSuffix(templateParam, ".jpg"):
+		format = "jpeg"
+		templateID = strings.TrimSuffix(templateParam, ".jpg")
+	case strings.HasSuffix(templateParam, ".png"):
+		format = "png"
+		templateID = strings.TrimSuffix(templateParam, ".png")
+	default:
+		if qFormat := r.URL.Query().Get("format"); qFormat != "" {
+			format = qFormat
+		}
+	}
+
 	queryParams := make(map[string]string)
 	for k, v := range r.URL.Query() {
 		if len(v) > 0 {
@@ -111,7 +134,6 @@ func (s *Server) handleRenderCard(w http.ResponseWriter, r *http.Request) {
 		}
 	}
 
-	// 2. Validate HMAC Signature if configured
 	if s.cfg.Secret != "" {
 		sig := queryParams["sig"]
 		if !VerifySignature(s.cfg.Secret, templateID, queryParams, sig) {
@@ -120,17 +142,14 @@ func (s *Server) handleRenderCard(w http.ResponseWriter, r *http.Request) {
 		}
 	}
 
-	// 3. Resolve Template
 	tmpl, err := s.templates.Get(templateID)
 	if err != nil {
 		http.Error(w, fmt.Sprintf("template not found: %s", templateID), http.StatusNotFound)
 		return
 	}
 
-	// 4. Compute Cache Key & ETag
-	cacheKey, etag := cache.ComputeKey(tmpl.ID, queryParams)
+	cacheKey, etag := cache.ComputeKey(tmpl.ID+"."+format, queryParams)
 
-	// 5. Evaluate RFC 9111 If-None-Match
 	if match := r.Header.Get("If-None-Match"); match != "" && match == etag {
 		w.Header().Set("ETag", etag)
 		w.Header().Set("Cache-Control", "public, max-age=31536000, immutable")
@@ -140,10 +159,16 @@ func (s *Server) handleRenderCard(w http.ResponseWriter, r *http.Request) {
 
 	refresh := r.URL.Query().Get("_refresh") == "true"
 
-	// 6. Check Cache (if not refreshing)
 	if !refresh {
 		if cached, hit := s.cache.Get(cacheKey); hit {
-			w.Header().Set("Content-Type", "image/png")
+			contentType := "image/png"
+			if format == "webp" {
+				contentType = "image/webp"
+			} else if format == "jpeg" || format == "jpg" {
+				contentType = "image/jpeg"
+			}
+
+			w.Header().Set("Content-Type", contentType)
 			w.Header().Set("Content-Length", strconv.Itoa(len(cached.Data)))
 			w.Header().Set("ETag", cached.ETag)
 			w.Header().Set("Cache-Control", "public, max-age=31536000, immutable")
@@ -154,9 +179,8 @@ func (s *Server) handleRenderCard(w http.ResponseWriter, r *http.Request) {
 		}
 	}
 
-	// 7. Render on MISS
 	start := time.Now()
-	imgBytes, err := renderer.RenderCard(tmpl, queryParams)
+	imgBytes, contentType, err := renderer.RenderCardFormat(tmpl, queryParams, format)
 	if err != nil {
 		http.Error(w, fmt.Sprintf("render error: %v", err), http.StatusInternalServerError)
 		return
@@ -164,11 +188,9 @@ func (s *Server) handleRenderCard(w http.ResponseWriter, r *http.Request) {
 	renderDuration := time.Since(start)
 	s.rendersTotal.Add(1)
 
-	// 8. Store in Two-Tier Cache
 	s.cache.Set(cacheKey, imgBytes)
 
-	// 9. Return Response
-	w.Header().Set("Content-Type", "image/png")
+	w.Header().Set("Content-Type", contentType)
 	w.Header().Set("Content-Length", strconv.Itoa(len(imgBytes)))
 	w.Header().Set("ETag", etag)
 	w.Header().Set("Cache-Control", "public, max-age=31536000, immutable")
@@ -185,15 +207,20 @@ func (s *Server) handleLiveRender(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	format := payload.Format
+	if format == "" {
+		format = "png"
+	}
+
 	start := time.Now()
-	imgBytes, err := renderer.RenderCard(&payload.Template, payload.Params)
+	imgBytes, contentType, err := renderer.RenderCardFormat(&payload.Template, payload.Params, format)
 	if err != nil {
 		http.Error(w, fmt.Sprintf("render error: %v", err), http.StatusInternalServerError)
 		return
 	}
 	duration := time.Since(start)
 
-	w.Header().Set("Content-Type", "image/png")
+	w.Header().Set("Content-Type", contentType)
 	w.Header().Set("Content-Length", strconv.Itoa(len(imgBytes)))
 	w.Header().Set("X-Render-Time", fmt.Sprintf("%.2fms", float64(duration.Microseconds())/1000.0))
 	w.WriteHeader(http.StatusOK)
@@ -245,6 +272,28 @@ func (s *Server) handleDeleteTemplate(w http.ResponseWriter, r *http.Request) {
 	_ = json.NewEncoder(w).Encode(map[string]string{"status": "deleted", "id": id})
 }
 
+func (s *Server) handleCachePurge(w http.ResponseWriter, r *http.Request) {
+	if s.cfg.Secret != "" {
+		authHeader := r.Header.Get("Authorization")
+		expected := "Bearer " + s.cfg.Secret
+		if authHeader != expected && r.URL.Query().Get("secret") != s.cfg.Secret {
+			http.Error(w, "unauthorized cache purge", http.StatusUnauthorized)
+			return
+		}
+	}
+
+	if err := s.cache.Clear(); err != nil {
+		http.Error(w, fmt.Sprintf("cache clear error: %v", err), http.StatusInternalServerError)
+		return
+	}
+
+	w.Header().Set("Content-Type", "application/json")
+	_ = json.NewEncoder(w).Encode(map[string]interface{}{
+		"status":  "success",
+		"message": "cache cleared successfully",
+	})
+}
+
 func (s *Server) handleHealth(w http.ResponseWriter, r *http.Request) {
 	var m runtime.MemStats
 	runtime.ReadMemStats(&m)
@@ -286,6 +335,50 @@ func (s *Server) handleHealth(w http.ResponseWriter, r *http.Request) {
 	_ = json.NewEncoder(w).Encode(diag)
 }
 
+func (s *Server) handlePrometheusMetrics(w http.ResponseWriter, r *http.Request) {
+	var m runtime.MemStats
+	runtime.ReadMemStats(&m)
+
+	l1Items, l1Bytes, l1Hits, l1Misses, l1Evicts := s.cache.L1.Stats()
+	l2Hits, l2Misses, l2Writes := s.cache.L2.Stats()
+
+	w.Header().Set("Content-Type", "text/plain; version=0.0.4; charset=utf-8")
+
+	fmt.Fprintf(w, "# HELP ogcraft_uptime_seconds Total daemon uptime in seconds\n")
+	fmt.Fprintf(w, "# TYPE ogcraft_uptime_seconds counter\n")
+	fmt.Fprintf(w, "ogcraft_uptime_seconds %d\n\n", int(time.Since(s.startTime).Seconds()))
+
+	fmt.Fprintf(w, "# HELP ogcraft_renders_total Total number of cards rendered\n")
+	fmt.Fprintf(w, "# TYPE ogcraft_renders_total counter\n")
+	fmt.Fprintf(w, "ogcraft_renders_total %d\n\n", s.rendersTotal.Load())
+
+	fmt.Fprintf(w, "# HELP ogcraft_cache_hits_total Cache hit counter by tier\n")
+	fmt.Fprintf(w, "# TYPE ogcraft_cache_hits_total counter\n")
+	fmt.Fprintf(w, "ogcraft_cache_hits_total{tier=\"l1\"} %d\n", l1Hits)
+	fmt.Fprintf(w, "ogcraft_cache_hits_total{tier=\"l2\"} %d\n\n", l2Hits)
+
+	fmt.Fprintf(w, "# HELP ogcraft_cache_misses_total Cache misses by tier\n")
+	fmt.Fprintf(w, "# TYPE ogcraft_cache_misses_total counter\n")
+	fmt.Fprintf(w, "ogcraft_cache_misses_total{tier=\"l1\"} %d\n", l1Misses)
+	fmt.Fprintf(w, "ogcraft_cache_misses_total{tier=\"l2\"} %d\n\n", l2Misses)
+
+	fmt.Fprintf(w, "# HELP ogcraft_cache_bytes Current byte usage of L1 memory cache\n")
+	fmt.Fprintf(w, "# TYPE ogcraft_cache_bytes gauge\n")
+	fmt.Fprintf(w, "ogcraft_cache_bytes{tier=\"l1\"} %d\n\n", l1Bytes)
+
+	fmt.Fprintf(w, "# HELP ogcraft_cache_items Number of items cached\n")
+	fmt.Fprintf(w, "# TYPE ogcraft_cache_items gauge\n")
+	fmt.Fprintf(w, "ogcraft_cache_items{tier=\"l1\"} %d\n", l1Items)
+	fmt.Fprintf(w, "ogcraft_cache_evictions_total{tier=\"l1\"} %d\n", l1Evicts)
+	fmt.Fprintf(w, "ogcraft_cache_writes_total{tier=\"l2\"} %d\n\n", l2Writes)
+
+	fmt.Fprintf(w, "# HELP ogcraft_memory_alloc_bytes Memory bytes allocated and currently in use\n")
+	fmt.Fprintf(w, "# TYPE ogcraft_memory_alloc_bytes gauge\n")
+	fmt.Fprintf(w, "ogcraft_memory_alloc_bytes %d\n", m.Alloc)
+	fmt.Fprintf(w, "ogcraft_memory_sys_bytes %d\n", m.Sys)
+	fmt.Fprintf(w, "ogcraft_goroutines %d\n", runtime.NumGoroutine())
+}
+
 func (s *Server) handleFallbackIndex(w http.ResponseWriter, r *http.Request) {
 	w.Header().Set("Content-Type", "text/html; charset=utf-8")
 	html := `<!DOCTYPE html>
@@ -313,6 +406,7 @@ func (s *Server) handleFallbackIndex(w http.ResponseWriter, r *http.Request) {
 		<p><a class="btn" target="_blank" href="/v1/cards/dark_tech.png?title=Sub-15ms+Social+Cards&author=Alexandr+Motologa&tag=Go">Open Test Card (dark_tech.png)</a></p>
 		<p>Check health diagnostics: <a href="/health"><code>/health</code></a></p>
 		<p>View registered templates: <a href="/v1/templates"><code>/v1/templates</code></a></p>
+		<p>Prometheus metrics: <a href="/metrics"><code>/metrics</code></a></p>
 	</div>
 </body>
 </html>`

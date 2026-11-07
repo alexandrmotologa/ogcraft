@@ -13,10 +13,13 @@ export interface BackgroundSpec {
   radius?: number;
   center_color?: string;
   outer_color?: string;
+  pattern?: 'none' | 'dots' | 'grid' | 'lines';
+  pattern_color?: string;
+  pattern_spacing?: number;
 }
 
 export interface ElementSpec {
-  type: 'text' | 'badge' | 'avatar' | 'icon' | 'divider' | 'container';
+  type: 'text' | 'badge' | 'avatar' | 'icon' | 'divider' | 'container' | 'code' | 'metric';
   field?: string;
   default?: string;
   font?: string;
@@ -39,6 +42,16 @@ export interface ElementSpec {
   icon?: string;
   size?: number;
   shape?: 'circle' | 'rounded' | 'square';
+
+  // Code snippet properties
+  language?: string;
+  show_controls?: boolean;
+  line_numbers?: boolean;
+
+  // Metric properties
+  value?: string;
+  subtext?: string;
+  progress?: number;
 }
 
 export interface Template {

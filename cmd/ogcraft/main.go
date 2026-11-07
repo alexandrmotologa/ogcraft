@@ -2,12 +2,19 @@ package main
 
 import (
 	"context"
+	"encoding/csv"
+	"encoding/json"
 	"flag"
 	"fmt"
+	"io"
 	"net/http"
 	"os"
 	"os/signal"
+	"path/filepath"
+	"runtime"
 	"strings"
+	"sync"
+	"sync/atomic"
 	"syscall"
 	"time"
 
@@ -39,12 +46,13 @@ func main() {
 		runServe(args)
 	case "render":
 		runRender(args)
+	case "batch":
+		runBatch(args)
 	case "version", "--version", "-v":
-		fmt.Printf("ogcraft v%s (Go vector engine, React 19 visual designer)\n", Version)
+		fmt.Printf("ogcraft v%s (Go SIMD vector engine, React 19 visual designer)\n", Version)
 	case "help", "--help", "-h":
 		printUsage()
 	default:
-		// If first arg starts with flag (e.g. --port 8080), treat as serve
 		if strings.HasPrefix(command, "-") {
 			runServe(os.Args[1:])
 			return
@@ -64,6 +72,7 @@ Usage:
 Commands:
   serve     Start the HTTP daemon and embedded visual designer (default)
   render    Render a social card directly from CLI to file
+  batch     Batch pre-render social cards from JSON or CSV (SSG build mode)
   version   Print version information
   help      Show this help message
 
@@ -78,8 +87,17 @@ Options for 'serve':
 
 Options for 'render':
   --template, -t       Template ID to render (default: dark_tech)
+  --format, -f         Image format: png, webp, jpeg (default: png)
   --param, -p          Dynamic parameter formatted as key=value (repeatable)
   --output, -o         Output file path (default: card.png)
+  --templates-dir      Directory containing custom templates
+
+Options for 'batch':
+  --input, -i          Input JSON or CSV file containing records (required)
+  --template, -t       Template ID to render (default: dark_tech)
+  --format, -f         Image format: png, webp, jpeg (default: png)
+  --out-dir, -o        Output directory to save cards (default: ./dist/og)
+  --concurrency, -c    Number of parallel worker routines (default: CPU cores)
   --templates-dir      Directory containing custom templates`)
 }
 
@@ -98,6 +116,9 @@ func runRender(args []string) {
 	fs := flag.NewFlagSet("render", flag.ExitOnError)
 	tmplID := fs.String("template", "dark_tech", "Template ID")
 	fs.StringVar(tmplID, "t", "dark_tech", "Template ID (shorthand)")
+
+	format := fs.String("format", "png", "Image format: png, webp, jpeg")
+	fs.StringVar(format, "f", "png", "Image format (shorthand)")
 
 	output := fs.String("output", "card.png", "Output file path")
 	fs.StringVar(output, "o", "card.png", "Output file path (shorthand)")
@@ -139,7 +160,7 @@ func runRender(args []string) {
 	}
 
 	start := time.Now()
-	imgBytes, err := renderer.RenderCard(tmpl, paramMap)
+	imgBytes, _, err := renderer.RenderCardFormat(tmpl, paramMap, *format)
 	if err != nil {
 		fmt.Fprintf(os.Stderr, "rendering failed: %v\n", err)
 		os.Exit(1)
@@ -152,6 +173,147 @@ func runRender(args []string) {
 	}
 
 	fmt.Printf("Rendered %s -> %s (%d KB, %6.2fms)\n", *tmplID, *output, len(imgBytes)/1024, float64(duration.Microseconds())/1000.0)
+}
+
+func runBatch(args []string) {
+	fs := flag.NewFlagSet("batch", flag.ExitOnError)
+	input := fs.String("input", "", "Input JSON or CSV file path (required)")
+	fs.StringVar(input, "i", "", "Input file path (shorthand)")
+
+	tmplID := fs.String("template", "dark_tech", "Template ID")
+	fs.StringVar(tmplID, "t", "dark_tech", "Template ID (shorthand)")
+
+	format := fs.String("format", "png", "Output format (png, webp, jpeg)")
+	fs.StringVar(format, "f", "png", "Output format (shorthand)")
+
+	outDir := fs.String("out-dir", "./dist/og", "Output directory")
+	fs.StringVar(outDir, "o", "./dist/og", "Output directory (shorthand)")
+
+	concurrency := fs.Int("concurrency", runtime.NumCPU(), "Worker concurrency")
+	fs.StringVar(tmplID, "c", "dark_tech", "Concurrency (shorthand)")
+
+	templatesDir := fs.String("templates-dir", "./data/templates", "Templates directory")
+
+	if err := fs.Parse(args); err != nil || *input == "" {
+		fmt.Fprintf(os.Stderr, "error: --input file is required\n")
+		fs.Usage()
+		os.Exit(1)
+	}
+
+	if err := os.MkdirAll(*outDir, 0755); err != nil {
+		fmt.Fprintf(os.Stderr, "failed to create output directory %s: %v\n", *outDir, err)
+		os.Exit(1)
+	}
+
+	if err := fonts.Init(); err != nil {
+		fmt.Fprintf(os.Stderr, "failed to initialize fonts: %v\n", err)
+		os.Exit(1)
+	}
+
+	tmplMgr, err := templates.NewManager(*templatesDir)
+	if err != nil {
+		fmt.Fprintf(os.Stderr, "failed to load templates: %v\n", err)
+		os.Exit(1)
+	}
+
+	tmpl, err := tmplMgr.Get(*tmplID)
+	if err != nil {
+		fmt.Fprintf(os.Stderr, "error resolving template %s: %v\n", *tmplID, err)
+		os.Exit(1)
+	}
+
+	// Parse records from JSON or CSV
+	records, err := loadBatchRecords(*input)
+	if err != nil {
+		fmt.Fprintf(os.Stderr, "failed to load input records: %v\n", err)
+		os.Exit(1)
+	}
+
+	total := len(records)
+	fmt.Printf("Starting batch render: %d cards using template %q (%s, %d workers)\n", total, *tmplID, *format, *concurrency)
+
+	start := time.Now()
+	var processed atomic.Int64
+
+	jobs := make(chan map[string]string, total)
+	for _, rec := range records {
+		jobs <- rec
+	}
+	close(jobs)
+
+	var wg sync.WaitGroup
+	for w := 0; w < *concurrency; w++ {
+		wg.Add(1)
+		go func() {
+			defer wg.Done()
+			for rec := range jobs {
+				filename := rec["slug"]
+				if filename == "" {
+					filename = rec["id"]
+				}
+				if filename == "" {
+					filename = fmt.Sprintf("card_%d", processed.Add(1))
+				} else {
+					processed.Add(1)
+				}
+
+				destFile := filepath.Join(*outDir, fmt.Sprintf("%s.%s", filename, *format))
+				imgBytes, _, err := renderer.RenderCardFormat(tmpl, rec, *format)
+				if err != nil {
+					fmt.Fprintf(os.Stderr, "error rendering %s: %v\n", filename, err)
+					continue
+				}
+
+				_ = os.WriteFile(destFile, imgBytes, 0644)
+			}
+		}()
+	}
+
+	wg.Wait()
+	elapsed := time.Since(start)
+	avgMs := float64(elapsed.Milliseconds()) / float64(total)
+	fmt.Printf("Batch completed! Rendered %d cards in %v (avg %.1fms per card)\nOutput directory: %s\n", total, elapsed, avgMs, *outDir)
+}
+
+func loadBatchRecords(path string) ([]map[string]string, error) {
+	data, err := os.ReadFile(path)
+	if err != nil {
+		return nil, err
+	}
+
+	// Try JSON first
+	var jsonRecords []map[string]string
+	if err := json.Unmarshal(data, &jsonRecords); err == nil && len(jsonRecords) > 0 {
+		return jsonRecords, nil
+	}
+
+	// Try CSV fallback
+	r := csv.NewReader(strings.NewReader(string(data)))
+	header, err := r.Read()
+	if err != nil {
+		return nil, fmt.Errorf("file is neither valid JSON nor CSV")
+	}
+
+	var results []map[string]string
+	for {
+		row, err := r.Read()
+		if err == io.EOF {
+			break
+		}
+		if err != nil {
+			return nil, err
+		}
+
+		item := make(map[string]string)
+		for i, col := range row {
+			if i < len(header) {
+				item[header[i]] = col
+			}
+		}
+		results = append(results, item)
+	}
+
+	return results, nil
 }
 
 func runServe(args []string) {
@@ -203,7 +365,6 @@ func runServe(args []string) {
 		IdleTimeout:  60 * time.Second,
 	}
 
-	// Print startup cockpit banner
 	fmt.Println()
 	fmt.Println("  ┌─────────────────────────────────────────────────────────────┐")
 	fmt.Printf("  │  ogcraft v%-48s│\n", Version)
@@ -211,6 +372,8 @@ func runServe(args []string) {
 	fmt.Println("  ├─────────────────────────────────────────────────────────────┤")
 	fmt.Printf("  │  Visual Studio Cockpit : http://localhost:%-5d              │\n", cfg.Port)
 	fmt.Printf("  │  Sample Card Endpoint  : /v1/cards/dark_tech.png            │\n")
+	fmt.Printf("  │  Supported Formats     : PNG, WebP, JPEG                    │\n")
+	fmt.Printf("  │  Prometheus Metrics    : /metrics                           │\n")
 	fmt.Printf("  │  L1 Memory Cache Cap   : %-35s│\n", fmt.Sprintf("%.1f MB RAM", float64(cfg.L1MaxBytes)/1024/1024))
 	fmt.Printf("  │  L2 Disk Store Path    : %-35s│\n", cfg.CacheDir)
 	if cfg.Secret != "" {
@@ -221,7 +384,6 @@ func runServe(args []string) {
 	fmt.Println("  └─────────────────────────────────────────────────────────────┘")
 	fmt.Println()
 
-	// Graceful shutdown channel
 	shutdownChan := make(chan os.Signal, 1)
 	signal.Notify(shutdownChan, os.Interrupt, syscall.SIGTERM)
 

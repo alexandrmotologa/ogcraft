@@ -1,11 +1,11 @@
 # ogcraft Template Specification
 
-Templates in `ogcraft` are declared in JSON. Each template defines a 1200x630 pixel canvas, background styling, and a list of visual elements that bind to URL query parameters.
+Templates in `ogcraft` are declared in JSON. Each template defines a 1200x630 pixel canvas, background styling, vector pattern overlays, and a list of visual elements that bind to URL query parameters.
 
 ## Canvas Specifications
-- Width: 1200 pixels
-- Height: 630 pixels (standard OpenGraph 1.904:1 aspect ratio)
-- Coordinate system: Origin `(0, 0)` is the top-left corner.
+- Default Width: 1200 pixels
+- Default Height: 630 pixels (standard OpenGraph 1.904:1 aspect ratio)
+- Multi-Aspect Overrides: Supports `?aspect=square` (800x800), `?aspect=story` (1080x1920), or custom `?w=...&h=...`.
 
 ---
 
@@ -13,60 +13,41 @@ Templates in `ogcraft` are declared in JSON. Each template defines a 1200x630 pi
 
 ```json
 {
-  "id": "template_id",
-  "name": "Human Readable Name",
+  "id": "dark_tech",
+  "name": "Dark Tech and Developer",
   "width": 1200,
   "height": 630,
   "background": {
     "type": "gradient",
     "direction": "to-bottom-right",
+    "pattern": "dots",
+    "pattern_color": "#ffffff0f",
+    "pattern_spacing": 28,
     "stops": [
-      { "offset": 0.0, "color": "#0d1117" },
-      { "offset": 1.0, "color": "#161b22" }
+      { "offset": 0.0, "color": "#090d16" },
+      { "offset": 1.0, "color": "#121a29" }
     ]
   },
   "elements": []
 }
 ```
 
-### Background Types
-1. **Solid Color**:
-   ```json
-   {
-     "type": "solid",
-     "color": "#0a0a0c"
-   }
-   ```
-2. **Linear Gradient**:
-   ```json
-   {
-     "type": "gradient",
-     "direction": "to-bottom-right",
-     "stops": [
-       { "offset": 0.0, "color": "#111827" },
-       { "offset": 1.0, "color": "#1f2937" }
-     ]
-   }
-   ```
-   Supported directions: `to-right`, `to-bottom`, `to-bottom-right`, `to-bottom-left`.
-3. **Radial Accent**:
-   ```json
-   {
-     "type": "radial",
-     "center_x": 1000,
-     "center_y": 100,
-     "radius": 450,
-     "center_color": "#3b82f633",
-     "outer_color": "#090d16"
-   }
-   ```
+### Background Types & Overlays
+1. **Solid Color**: `{"type": "solid", "color": "#0a0a0c"}`
+2. **Linear Gradient**: `{"type": "gradient", "direction": "to-bottom-right", "stops": [...]}`
+3. **Radial Accent**: `{"type": "radial", "center_x": 1050, "center_y": 120, "radius": 600, "center_color": "#8b5cf644", "outer_color": "#05070d"}`
+4. **Pattern Overlays**:
+   - `dots`: Dot grid overlay across the canvas
+   - `grid`: Tech grid lines
+   - `lines`: Diagonal 45-degree pinstripes
+   - `none`: Smooth background without texture
 
 ---
 
 ## Element Types
 
 ### 1. `text`
-Renders dynamic or static typography with automatic wrapping, truncation, and dynamic `fit_text` scaling.
+Typography with automatic line-wrapping, line truncation, and dynamic `fit_text` downscaling.
 
 ```json
 {
@@ -85,23 +66,19 @@ Renders dynamic or static typography with automatic wrapping, truncation, and dy
 }
 ```
 
-- `field`: URL query parameter key that supplies the text.
-- `default`: Fallback text when parameter is omitted.
-- `font`: `Inter-Regular`, `Inter-SemiBold`, `Inter-Bold`, or `JetBrainsMono-Medium`.
-- `fit_text`: When true, font size automatically decreases if the text exceeds `max_lines` within `max_width`.
-
 ---
 
 ### 2. `badge`
-Renders a rounded pill or tag with background color, padding, and text.
+Pill with background color, padding, rounded corners, and optional vector icon.
 
 ```json
 {
   "type": "badge",
   "field": "tag",
   "default": "ENGINEERING",
+  "icon": "bolt",
   "font": "JetBrainsMono-Medium",
-  "font_size": 22,
+  "font_size": 20,
   "color": "#ffffff",
   "background_color": "#2563eb",
   "x": 80,
@@ -114,8 +91,54 @@ Renders a rounded pill or tag with background color, padding, and text.
 
 ---
 
-### 3. `avatar`
-Renders an author profile image, logo, or icon.
+### 3. `code`
+Terminal code snippet window with macOS window controls, line numbers, and syntax highlighting.
+
+```json
+{
+  "type": "code",
+  "field": "code",
+  "default": "package main\n\nfunc main() {\n    println(\"Zero-CGo OpenGraph Engine\")\n}",
+  "language": "go",
+  "x": 80,
+  "y": 180,
+  "width": 680,
+  "height": 340,
+  "font_size": 20,
+  "show_controls": true,
+  "line_numbers": true
+}
+```
+
+---
+
+### 4. `metric`
+Stat callout card with big numerical value, subtext label, optional icon, and progress bar.
+
+```json
+{
+  "type": "metric",
+  "field": "stars",
+  "value": "14.2k",
+  "subtext": "GitHub Stargazers",
+  "icon": "star",
+  "x": 800,
+  "y": 180,
+  "width": 320,
+  "height": 140,
+  "background_color": "#161e2e",
+  "color": "#38bdf8",
+  "border_color": "#223048",
+  "border_width": 1,
+  "border_radius": 12,
+  "progress": 0.85
+}
+```
+
+---
+
+### 5. `avatar`
+Author profile picture, logo, or icon with SSRF protection, circular clipping, and monogram fallback.
 
 ```json
 {
@@ -131,52 +154,23 @@ Renders an author profile image, logo, or icon.
 }
 ```
 
-Shapes supported: `circle`, `rounded` (uses border_radius 12), `square`.
-When remote download fails, `ogcraft` automatically renders a fallback monogram containing the author's initials.
-
 ---
 
-### 4. `icon`
-Renders embedded vector icons.
+### 6. `icon`
+Vector icon (`github`, `twitter`, `x`, `star`, `clock`, `calendar`, `user`, `tag`, `bolt`, `check`).
 
 ```json
 {
   "type": "icon",
-  "name": "github",
+  "icon": "github",
   "x": 80,
   "y": 550,
-  "size": 28,
+  "size": 32,
   "color": "#9ca3af"
 }
 ```
 
-Available icons: `github`, `twitter`, `x`, `star`, `clock`, `calendar`, `user`, `tag`, `bolt`, `check`.
-
 ---
 
-### 5. `divider`
-Renders a horizontal or vertical rule separator.
-
-```json
-{
-  "type": "divider",
-  "x": 80,
-  "y": 440,
-  "width": 1040,
-  "height": 1,
-  "color": "#1f2937"
-}
-```
-
----
-
-## Built-In Templates
-
-`ogcraft` ships with six built-in presets:
-
-1. **`dark_tech`**: Deep obsidian background with gradient undertone, monospace category badge, primary headline, author avatar, and author name.
-2. **`minimal_light`**: Clean off-white background with bold high-contrast typography, category pill, and date.
-3. **`glow_dev`**: Cyberpunk dark canvas with radial corner light source and accent cards.
-4. **`product_launch`**: Product announcement card with CTA badge and metric badge.
-5. **`podcast_event`**: Event and podcast card with date pill, speaker avatar, and episode indicator.
-6. **`github_repo`**: Open source repository card with language dot, star count, and fork indicators.
+### 7. `divider` & `container`
+Horizontal/vertical dividers and background frames for visual separation.

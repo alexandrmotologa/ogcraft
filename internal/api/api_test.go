@@ -3,11 +3,13 @@ package api_test
 import (
 	"bytes"
 	"encoding/json"
+	"image/jpeg"
 	"image/png"
 	"net/http"
 	"net/http/httptest"
 	"os"
 	"path/filepath"
+	"strings"
 	"testing"
 
 	"github.com/alexandrmotologa/ogcraft/internal/api"
@@ -44,13 +46,13 @@ func setupTestServer(t *testing.T, secret string) (*api.Server, string) {
 	return server, tempDir
 }
 
-func TestHealthEndpoint(t *testing.T) {
+func TestHealthAndPrometheusEndpoints(t *testing.T) {
 	server, tempDir := setupTestServer(t, "")
 	defer os.RemoveAll(tempDir)
 
+	// Test /health
 	req := httptest.NewRequest("GET", "/health", nil)
 	rec := httptest.NewRecorder()
-
 	server.Router().ServeHTTP(rec, req)
 
 	if rec.Code != http.StatusOK {
@@ -61,9 +63,63 @@ func TestHealthEndpoint(t *testing.T) {
 	if err := json.NewDecoder(rec.Body).Decode(&res); err != nil {
 		t.Fatalf("invalid json response: %v", err)
 	}
-
 	if res["status"] != "healthy" {
 		t.Fatalf("expected status healthy, got %v", res["status"])
+	}
+
+	// Test /metrics
+	reqMetrics := httptest.NewRequest("GET", "/metrics", nil)
+	recMetrics := httptest.NewRecorder()
+	server.Router().ServeHTTP(recMetrics, reqMetrics)
+
+	if recMetrics.Code != http.StatusOK {
+		t.Fatalf("expected 200 for metrics, got %d", recMetrics.Code)
+	}
+	metricsBody := recMetrics.Body.String()
+	if !strings.Contains(metricsBody, "ogcraft_renders_total") || !strings.Contains(metricsBody, "ogcraft_uptime_seconds") {
+		t.Fatalf("metrics missing expected prometheus keys: %s", metricsBody)
+	}
+}
+
+func TestRenderCardWithFormatsAndCachePurge(t *testing.T) {
+	server, tempDir := setupTestServer(t, "")
+	defer os.RemoveAll(tempDir)
+
+	// 1. Render WebP
+	reqWebp := httptest.NewRequest("GET", "/v1/cards/dark_tech.webp?title=WebP+Test", nil)
+	recWebp := httptest.NewRecorder()
+	server.Router().ServeHTTP(recWebp, reqWebp)
+
+	if recWebp.Code != http.StatusOK {
+		t.Fatalf("webp render failed: %d", recWebp.Code)
+	}
+	if cType := recWebp.Header().Get("Content-Type"); cType != "image/webp" {
+		t.Errorf("expected Content-Type image/webp, got %s", cType)
+	}
+
+	// 2. Render JPEG
+	reqJpeg := httptest.NewRequest("GET", "/v1/cards/dark_tech.jpg?title=JPEG+Test", nil)
+	recJpeg := httptest.NewRecorder()
+	server.Router().ServeHTTP(recJpeg, reqJpeg)
+
+	if recJpeg.Code != http.StatusOK {
+		t.Fatalf("jpeg render failed: %d", recJpeg.Code)
+	}
+	if cType := recJpeg.Header().Get("Content-Type"); cType != "image/jpeg" {
+		t.Errorf("expected Content-Type image/jpeg, got %s", cType)
+	}
+	_, err := jpeg.DecodeConfig(bytes.NewReader(recJpeg.Body.Bytes()))
+	if err != nil {
+		t.Fatalf("invalid jpeg produced: %v", err)
+	}
+
+	// 3. Test Cache Purge
+	reqPurge := httptest.NewRequest("POST", "/v1/cache/purge", nil)
+	recPurge := httptest.NewRecorder()
+	server.Router().ServeHTTP(recPurge, reqPurge)
+
+	if recPurge.Code != http.StatusOK {
+		t.Fatalf("expected 200 for cache purge, got %d", recPurge.Code)
 	}
 }
 
@@ -89,7 +145,6 @@ func TestRenderCardWithTwoTierCacheAndETag(t *testing.T) {
 		t.Fatal("expected non-empty ETag header")
 	}
 
-	// Verify valid PNG
 	_, err := png.DecodeConfig(bytes.NewReader(rec1.Body.Bytes()))
 	if err != nil {
 		t.Fatalf("invalid PNG returned: %v", err)
@@ -129,7 +184,6 @@ func TestHMACSignatureVerification(t *testing.T) {
 		"author": "Motologa",
 	}
 
-	// 1. Request without signature should fail 401
 	unsignedURL := "/v1/cards/minimal_light.png?title=Signed+Request+Card&author=Motologa"
 	req1 := httptest.NewRequest("GET", unsignedURL, nil)
 	rec1 := httptest.NewRecorder()
@@ -139,7 +193,6 @@ func TestHMACSignatureVerification(t *testing.T) {
 		t.Fatalf("expected 401 Unauthorized for unsigned request, got %d", rec1.Code)
 	}
 
-	// 2. Request with valid signature
 	sig := api.GenerateSignature(secret, template, params)
 	signedURL := unsignedURL + "&sig=" + sig
 	req2 := httptest.NewRequest("GET", signedURL, nil)
@@ -155,7 +208,6 @@ func TestTemplatesCRUD(t *testing.T) {
 	server, tempDir := setupTestServer(t, "")
 	defer os.RemoveAll(tempDir)
 
-	// List builtin
 	reqList := httptest.NewRequest("GET", "/v1/templates", nil)
 	recList := httptest.NewRecorder()
 	server.Router().ServeHTTP(recList, reqList)
@@ -166,7 +218,6 @@ func TestTemplatesCRUD(t *testing.T) {
 		t.Fatalf("expected at least 6 templates, got %d", len(list))
 	}
 
-	// Create custom template
 	custom := templates.Template{
 		ID:          "custom_brand",
 		Name:        "Custom Brand Card",
@@ -201,7 +252,6 @@ func TestTemplatesCRUD(t *testing.T) {
 		t.Fatalf("expected 201 Created, got %d: %s", recCreate.Code, recCreate.Body.String())
 	}
 
-	// Verify custom template can render
 	reqRender := httptest.NewRequest("GET", "/v1/cards/custom_brand.png?title=Hello+Custom", nil)
 	recRender := httptest.NewRecorder()
 	server.Router().ServeHTTP(recRender, reqRender)
@@ -210,7 +260,6 @@ func TestTemplatesCRUD(t *testing.T) {
 		t.Fatalf("rendering custom template failed: %d", recRender.Code)
 	}
 
-	// Delete custom template
 	reqDel := httptest.NewRequest("DELETE", "/v1/templates/custom_brand", nil)
 	recDel := httptest.NewRecorder()
 	server.Router().ServeHTTP(recDel, reqDel)

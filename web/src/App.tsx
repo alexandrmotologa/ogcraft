@@ -12,13 +12,35 @@ import { TemplateSelector } from './components/TemplateSelector';
 import { ElementInspector } from './components/ElementInspector';
 import { ParamTester } from './components/ParamTester';
 import { CodeExporter } from './components/CodeExporter';
-import { Cpu, Save, ShieldCheck } from 'lucide-react';
+import { SocialFeedSimulator } from './components/SocialFeedSimulator';
+import { TemplateImportModal } from './components/TemplateImportModal';
+import {
+  Cpu,
+  Save,
+  ShieldCheck,
+  Undo2,
+  Redo2,
+  Upload,
+  Download,
+  Eye,
+  LayoutTemplate,
+} from 'lucide-react';
 
 export const App: React.FC = () => {
   const [templateSummaries, setTemplateSummaries] = useState<TemplateSummary[]>([]);
   const [activeTemplateId, setActiveTemplateId] = useState<string>('dark_tech');
   const [activeTemplate, setActiveTemplate] = useState<Template | null>(null);
   const [selectedElementIndex, setSelectedElementIndex] = useState<number | null>(null);
+
+  // Undo / Redo history
+  const [history, setHistory] = useState<Template[]>([]);
+  const [historyIndex, setHistoryIndex] = useState<number>(-1);
+
+  // View Mode: 'canvas' or 'social-feed'
+  const [viewMode, setViewMode] = useState<'canvas' | 'social-feed'>('canvas');
+
+  // Modal
+  const [isImportModalOpen, setIsImportModalOpen] = useState(false);
 
   const [params, setParams] = useState<Record<string, string>>({});
   const [previewUrl, setPreviewUrl] = useState<string | null>(null);
@@ -55,9 +77,10 @@ export const App: React.FC = () => {
       .then((tmpl) => {
         if (cancelled) return;
         setActiveTemplate(tmpl);
+        setHistory([tmpl]);
+        setHistoryIndex(0);
         setSelectedElementIndex(null);
 
-        // Pre-fill params with element defaults
         const initialParams: Record<string, string> = {};
         for (const el of tmpl.elements) {
           if (el.field && el.default) {
@@ -73,7 +96,51 @@ export const App: React.FC = () => {
     };
   }, [activeTemplateId]);
 
-  // 3. Render card preview on template or params change (debounced 150ms)
+  // 3. Update active template with history push
+  const handleUpdateTemplate = useCallback((newTemplate: Template) => {
+    setActiveTemplate(newTemplate);
+    setHistory((prev) => {
+      const updated = prev.slice(0, historyIndex + 1);
+      return [...updated, newTemplate];
+    });
+    setHistoryIndex((prev) => prev + 1);
+  }, [historyIndex]);
+
+  // Undo / Redo
+  const handleUndo = useCallback(() => {
+    if (historyIndex > 0) {
+      const targetIndex = historyIndex - 1;
+      setHistoryIndex(targetIndex);
+      setActiveTemplate(history[targetIndex]);
+    }
+  }, [historyIndex, history]);
+
+  const handleRedo = useCallback(() => {
+    if (historyIndex < history.length - 1) {
+      const targetIndex = historyIndex + 1;
+      setHistoryIndex(targetIndex);
+      setActiveTemplate(history[targetIndex]);
+    }
+  }, [historyIndex, history]);
+
+  // Keyboard shortcuts (Ctrl+Z / Ctrl+Y)
+  useEffect(() => {
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if ((e.ctrlKey || e.metaKey) && e.key === 'z') {
+        if (e.shiftKey) {
+          handleRedo();
+        } else {
+          handleUndo();
+        }
+      } else if ((e.ctrlKey || e.metaKey) && e.key === 'y') {
+        handleRedo();
+      }
+    };
+    window.addEventListener('keydown', handleKeyDown);
+    return () => window.removeEventListener('keydown', handleKeyDown);
+  }, [handleUndo, handleRedo]);
+
+  // 4. Render card preview on template or params change
   const triggerRender = useCallback(
     (tmpl: Template, currentParams: Record<string, string>) => {
       if (debounceTimerRef.current) {
@@ -103,62 +170,6 @@ export const App: React.FC = () => {
     triggerRender(activeTemplate, params);
   }, [activeTemplate, params, triggerRender]);
 
-  const handleSelectTemplate = (id: string) => {
-    setActiveTemplateId(id);
-  };
-
-  const handleCreateNewTemplate = () => {
-    const newId = `custom_${Date.now().toString().slice(-4)}`;
-    const newTemplate: Template = {
-      id: newId,
-      name: `New Custom Card`,
-      description: 'Custom social preview card',
-      width: 1200,
-      height: 630,
-      background: {
-        type: 'gradient',
-        direction: 'to-bottom-right',
-        stops: [
-          { offset: 0.0, color: '#090d16' },
-          { offset: 1.0, color: '#161e2e' },
-        ],
-      },
-      elements: [
-        {
-          type: 'badge',
-          field: 'tag',
-          default: 'CUSTOM',
-          font: 'JetBrainsMono-Medium',
-          font_size: 18,
-          color: '#ffffff',
-          background_color: '#2563eb',
-          x: 80,
-          y: 80,
-          padding_x: 14,
-          padding_y: 6,
-          border_radius: 6,
-        },
-        {
-          type: 'text',
-          field: 'title',
-          default: 'Your Custom Headline Here',
-          font: 'Inter-Bold',
-          font_size: 54,
-          color: '#f8fafc',
-          x: 80,
-          y: 160,
-          max_width: 1040,
-          line_height: 1.25,
-          max_lines: 3,
-          fit_text: true,
-        },
-      ],
-    };
-
-    setActiveTemplate(newTemplate);
-    setActiveTemplateId(newId);
-  };
-
   const handleSaveCurrentTemplate = async () => {
     if (!activeTemplate) return;
     setIsSaving(true);
@@ -172,6 +183,19 @@ export const App: React.FC = () => {
     } finally {
       setIsSaving(false);
     }
+  };
+
+  const handleExportJSON = () => {
+    if (!activeTemplate) return;
+    const blob = new Blob([JSON.stringify(activeTemplate, null, 2)], {
+      type: 'application/json',
+    });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = `${activeTemplate.id}.json`;
+    a.click();
+    URL.revokeObjectURL(url);
   };
 
   const handleDeleteCustomTemplate = async (id: string) => {
@@ -215,10 +239,30 @@ export const App: React.FC = () => {
 
           <div className="h-5 w-px bg-slate-800 mx-1 hidden sm:block" />
 
-          <div className="hidden md:flex items-center gap-4 text-xs font-mono text-slate-400">
+          {/* Undo / Redo */}
+          <div className="flex items-center gap-1 bg-slate-900 border border-slate-800 rounded-lg p-0.5">
+            <button
+              onClick={handleUndo}
+              disabled={historyIndex <= 0}
+              className="p-1.5 hover:bg-slate-800 text-slate-400 hover:text-slate-200 disabled:opacity-30 rounded transition"
+              title="Undo (Ctrl+Z)"
+            >
+              <Undo2 size={13} />
+            </button>
+            <button
+              onClick={handleRedo}
+              disabled={historyIndex >= history.length - 1}
+              className="p-1.5 hover:bg-slate-800 text-slate-400 hover:text-slate-200 disabled:opacity-30 rounded transition"
+              title="Redo (Ctrl+Y)"
+            >
+              <Redo2 size={13} />
+            </button>
+          </div>
+
+          <div className="hidden lg:flex items-center gap-4 text-xs font-mono text-slate-400 ml-2">
             <span className="flex items-center gap-1.5">
               <Cpu size={13} className="text-emerald-400" />
-              SIMD Go 2D
+              SIMD Go 2D (WebP, PNG, JPEG)
             </span>
             <span className="flex items-center gap-1.5">
               <ShieldCheck size={13} className="text-sky-400" />
@@ -227,18 +271,62 @@ export const App: React.FC = () => {
           </div>
         </div>
 
+        {/* View Mode Switcher */}
+        <div className="flex items-center bg-[#070a10] border border-slate-800 rounded-lg p-0.5">
+          <button
+            onClick={() => setViewMode('canvas')}
+            className={`flex items-center gap-1.5 px-3 py-1 text-xs font-medium rounded-md transition ${
+              viewMode === 'canvas'
+                ? 'bg-sky-500/20 text-sky-300 font-semibold shadow'
+                : 'text-slate-400 hover:text-slate-200'
+            }`}
+          >
+            <LayoutTemplate size={13} />
+            Canvas Editor
+          </button>
+          <button
+            onClick={() => setViewMode('social-feed')}
+            className={`flex items-center gap-1.5 px-3 py-1 text-xs font-medium rounded-md transition ${
+              viewMode === 'social-feed'
+                ? 'bg-sky-500/20 text-sky-300 font-semibold shadow'
+                : 'text-slate-400 hover:text-slate-200'
+            }`}
+          >
+            <Eye size={13} />
+            Social Feeds
+          </button>
+        </div>
+
         {/* Right Action Buttons */}
-        <div className="flex items-center gap-3">
+        <div className="flex items-center gap-2">
           {saveStatus && (
-            <span className="text-xs text-emerald-400 font-mono transition animate-fade-in">
+            <span className="text-xs text-emerald-400 font-mono transition">
               ✓ {saveStatus}
             </span>
           )}
 
           <button
+            onClick={() => setIsImportModalOpen(true)}
+            className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-slate-900 hover:bg-slate-800 text-slate-300 text-xs font-medium border border-slate-800 transition"
+            title="Import JSON"
+          >
+            <Upload size={13} />
+            <span className="hidden sm:inline">Import</span>
+          </button>
+
+          <button
+            onClick={handleExportJSON}
+            className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-slate-900 hover:bg-slate-800 text-slate-300 text-xs font-medium border border-slate-800 transition"
+            title="Export JSON"
+          >
+            <Download size={13} />
+            <span className="hidden sm:inline">Export</span>
+          </button>
+
+          <button
             onClick={handleSaveCurrentTemplate}
             disabled={isSaving || !activeTemplate}
-            className="flex items-center gap-1.5 px-3.5 py-1.5 rounded-lg bg-slate-800 hover:bg-slate-700 text-slate-200 text-xs font-medium border border-slate-700 transition"
+            className="flex items-center gap-1.5 px-3.5 py-1.5 rounded-lg bg-sky-500 hover:bg-sky-400 text-slate-950 text-xs font-bold transition"
           >
             <Save size={13} />
             {isSaving ? 'Saving...' : 'Save Template'}
@@ -252,67 +340,134 @@ export const App: React.FC = () => {
         <TemplateSelector
           templates={templateSummaries}
           activeId={activeTemplateId}
-          onSelect={handleSelectTemplate}
-          onCreateNew={handleCreateNewTemplate}
+          onSelect={(id) => setActiveTemplateId(id)}
+          onCreateNew={() => {
+            const newId = `custom_${Date.now().toString().slice(-4)}`;
+            const tmpl: Template = {
+              id: newId,
+              name: 'New Custom Template',
+              width: 1200,
+              height: 630,
+              background: {
+                type: 'gradient',
+                direction: 'to-bottom-right',
+                pattern: 'dots',
+                stops: [
+                  { offset: 0, color: '#090d16' },
+                  { offset: 1, color: '#161e2e' },
+                ],
+              },
+              elements: [
+                {
+                  type: 'badge',
+                  field: 'tag',
+                  default: 'CUSTOM',
+                  font: 'JetBrainsMono-Medium',
+                  font_size: 18,
+                  color: '#ffffff',
+                  background_color: '#2563eb',
+                  x: 80,
+                  y: 80,
+                  padding_x: 14,
+                  padding_y: 6,
+                  border_radius: 6,
+                },
+                {
+                  type: 'text',
+                  field: 'title',
+                  default: 'Your Custom Headline Here',
+                  font: 'Inter-Bold',
+                  font_size: 54,
+                  color: '#f8fafc',
+                  x: 80,
+                  y: 160,
+                  max_width: 1040,
+                  line_height: 1.25,
+                  max_lines: 3,
+                  fit_text: true,
+                },
+              ],
+            };
+            handleUpdateTemplate(tmpl);
+            setActiveTemplateId(newId);
+          }}
           onDelete={handleDeleteCustomTemplate}
         />
 
-        {/* Center: Canvas Viewport & Parameter Controls */}
+        {/* Center Viewport */}
         {activeTemplate ? (
-          <div className="flex-1 flex flex-col h-full overflow-hidden">
-            <CanvasPreview
+          viewMode === 'canvas' ? (
+            <div className="flex-1 flex flex-col h-full overflow-hidden">
+              <CanvasPreview
+                template={activeTemplate}
+                previewUrl={previewUrl}
+                loading={loading}
+                renderTime={renderTime}
+                selectedElementIndex={selectedElementIndex}
+                onSelectElement={setSelectedElementIndex}
+                onUpdateElement={(idx, updated) => {
+                  const nextElements = [...activeTemplate.elements];
+                  nextElements[idx] = updated;
+                  handleUpdateTemplate({
+                    ...activeTemplate,
+                    elements: nextElements,
+                  });
+                }}
+                onRefresh={() => triggerRender(activeTemplate, params)}
+              />
+
+              {/* Bottom Controls: Simulator & Exporter */}
+              <div className="flex-shrink-0 flex flex-col max-h-72 overflow-y-auto">
+                <ParamTester
+                  template={activeTemplate}
+                  params={params}
+                  onChangeParam={handleParamChange}
+                  onResetParams={() => {
+                    const initial: Record<string, string> = {};
+                    for (const el of activeTemplate.elements) {
+                      if (el.field && el.default) {
+                        initial[el.field] = el.default;
+                      }
+                    }
+                    setParams(initial);
+                  }}
+                />
+                <CodeExporter template={activeTemplate} params={params} />
+              </div>
+            </div>
+          ) : (
+            <SocialFeedSimulator
               template={activeTemplate}
               previewUrl={previewUrl}
-              loading={loading}
-              renderTime={renderTime}
-              selectedElementIndex={selectedElementIndex}
-              onSelectElement={setSelectedElementIndex}
-              onUpdateElement={(idx, updated) => {
-                const nextElements = [...activeTemplate.elements];
-                nextElements[idx] = updated;
-                setActiveTemplate({
-                  ...activeTemplate,
-                  elements: nextElements,
-                });
-              }}
-              onRefresh={() => triggerRender(activeTemplate, params)}
+              params={params}
             />
-
-            {/* Bottom Controls: URL Parameter Simulator & Export */}
-            <div className="flex-shrink-0 flex flex-col max-h-72 overflow-y-auto">
-              <ParamTester
-                template={activeTemplate}
-                params={params}
-                onChangeParam={handleParamChange}
-                onResetParams={() => {
-                  const initial: Record<string, string> = {};
-                  for (const el of activeTemplate.elements) {
-                    if (el.field && el.default) {
-                      initial[el.field] = el.default;
-                    }
-                  }
-                  setParams(initial);
-                }}
-              />
-              <CodeExporter template={activeTemplate} params={params} />
-            </div>
-          </div>
+          )
         ) : (
           <div className="flex-1 flex items-center justify-center text-slate-500 font-mono text-sm">
             Loading template...
           </div>
         )}
 
-        {/* Right: Element / Canvas Inspector */}
-        {activeTemplate && (
+        {/* Right Inspector */}
+        {activeTemplate && viewMode === 'canvas' && (
           <ElementInspector
             template={activeTemplate}
             selectedElementIndex={selectedElementIndex}
-            onUpdateTemplate={setActiveTemplate}
+            onUpdateTemplate={handleUpdateTemplate}
             onSelectElement={setSelectedElementIndex}
           />
         )}
       </div>
+
+      {/* Import Modal */}
+      <TemplateImportModal
+        isOpen={isImportModalOpen}
+        onClose={() => setIsImportModalOpen(false)}
+        onImport={(imported) => {
+          handleUpdateTemplate(imported);
+          setActiveTemplateId(imported.id);
+        }}
+      />
     </div>
   );
 };

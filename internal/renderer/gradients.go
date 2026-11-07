@@ -9,7 +9,7 @@ import (
 	"github.com/fogleman/gg"
 )
 
-// ApplyBackground paints the background onto the canvas context.
+// ApplyBackground paints the background and optional pattern overlay onto the canvas context.
 func ApplyBackground(dc *gg.Context, width, height float64, bg templates.BackgroundSpec) {
 	dc.Push()
 	defer dc.Pop()
@@ -28,6 +28,59 @@ func ApplyBackground(dc *gg.Context, width, height float64, bg templates.Backgro
 		}
 		dc.SetRGBA(r, g, b, a)
 		dc.Clear()
+	}
+
+	// Apply pattern overlay if configured
+	if bg.Pattern != "" && bg.Pattern != "none" {
+		applyPatternOverlay(dc, width, height, bg)
+	}
+}
+
+func applyPatternOverlay(dc *gg.Context, width, height float64, bg templates.BackgroundSpec) {
+	dc.Push()
+	defer dc.Pop()
+
+	pColor := bg.PatternColor
+	if pColor == "" {
+		pColor = "#ffffff0f" // very subtle 6% white
+	}
+	r, g, b, a := icons.ParseHexColor(pColor)
+	dc.SetRGBA(r, g, b, a)
+
+	spacing := bg.PatternSpacing
+	if spacing <= 0 {
+		spacing = 30.0
+	}
+
+	switch strings.ToLower(bg.Pattern) {
+	case "dots":
+		dotRadius := 1.5
+		for x := spacing / 2; x < width; x += spacing {
+			for y := spacing / 2; y < height; y += spacing {
+				dc.DrawCircle(x, y, dotRadius)
+			}
+		}
+		dc.Fill()
+
+	case "grid":
+		dc.SetLineWidth(1.0)
+		for x := 0.0; x <= width; x += spacing {
+			dc.MoveTo(x, 0)
+			dc.LineTo(x, height)
+		}
+		for y := 0.0; y <= height; y += spacing {
+			dc.MoveTo(0, y)
+			dc.LineTo(width, y)
+		}
+		dc.Stroke()
+
+	case "lines":
+		dc.SetLineWidth(1.0)
+		for d := -height; d <= width+height; d += spacing {
+			dc.MoveTo(d, 0)
+			dc.LineTo(d+height, height)
+		}
+		dc.Stroke()
 	}
 }
 

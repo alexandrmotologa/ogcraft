@@ -23,8 +23,6 @@ const (
 
 var (
 	parsedFonts = make(map[string]*truetype.Font)
-	faceCache   = make(map[string]font.Face)
-	cacheMu     sync.RWMutex
 	initOnce    sync.Once
 )
 
@@ -57,31 +55,13 @@ func Init() error {
 	return initErr
 }
 
-// GetFontFace returns a cached font.Face for the given font name and point size.
+// GetFontFace returns a fresh, thread-safe font.Face for the given font name and point size.
 func GetFontFace(name string, size float64) (font.Face, error) {
 	if err := Init(); err != nil {
 		return nil, err
 	}
 
-	// Normalization & Fallbacks
 	normalized := normalizeFontName(name)
-
-	cacheKey := fmt.Sprintf("%s:%.1f", normalized, size)
-
-	cacheMu.RLock()
-	face, exists := faceCache[cacheKey]
-	cacheMu.RUnlock()
-	if exists {
-		return face, nil
-	}
-
-	cacheMu.Lock()
-	defer cacheMu.Unlock()
-
-	// Double check after lock
-	if face, exists := faceCache[cacheKey]; exists {
-		return face, nil
-	}
 
 	ttfFont, ok := parsedFonts[normalized]
 	if !ok {
@@ -94,10 +74,7 @@ func GetFontFace(name string, size float64) (font.Face, error) {
 		Hinting: font.HintingFull,
 	}
 
-	face = truetype.NewFace(ttfFont, opt)
-	faceCache[cacheKey] = face
-
-	return face, nil
+	return truetype.NewFace(ttfFont, opt), nil
 }
 
 // normalizeFontName resolves aliases and case differences to canonical font names.

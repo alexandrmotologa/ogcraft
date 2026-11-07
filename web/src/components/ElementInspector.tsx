@@ -1,6 +1,6 @@
 import React from 'react';
 import { ElementSpec, Template } from '../lib/types';
-import { Sliders, Trash2, Copy, Plus, Type, ShieldAlert, Image, Sparkles, Minus, Square } from 'lucide-react';
+import { Sliders, Trash2, Copy, Type, Image, Sparkles, Minus, Square, Terminal, BarChart2 } from 'lucide-react';
 
 interface ElementInspectorProps {
   template: Template;
@@ -137,6 +137,40 @@ export const ElementInspector: React.FC<ElementInspectorProps> = ({
           border_width: 1,
         };
         break;
+      case 'code':
+        newEl = {
+          type: 'code',
+          field: 'code',
+          default: 'package main\n\nimport "fmt"\n\nfunc main() {\n    fmt.Println("Zero CGo OpenGraph Engine")\n}',
+          language: 'go',
+          x: 80,
+          y: 180,
+          width: 680,
+          height: 320,
+          font_size: 20,
+          show_controls: true,
+          line_numbers: true,
+        };
+        break;
+      case 'metric':
+        newEl = {
+          type: 'metric',
+          field: 'metric',
+          value: '14.2k',
+          subtext: 'GitHub Stargazers',
+          icon: 'star',
+          x: 800,
+          y: 180,
+          width: 320,
+          height: 130,
+          background_color: '#161e2e',
+          color: '#38bdf8',
+          border_color: '#223048',
+          border_width: 1,
+          border_radius: 12,
+          progress: 0.85,
+        };
+        break;
     }
 
     const updatedElements = [...template.elements, newEl];
@@ -208,10 +242,8 @@ export const ElementInspector: React.FC<ElementInspectorProps> = ({
               </div>
             </div>
 
-            {/* Field & Default for text/badge/avatar */}
-            {(selectedElement.type === 'text' ||
-              selectedElement.type === 'badge' ||
-              selectedElement.type === 'avatar') && (
+            {/* Field & Default for text/badge/avatar/code/metric */}
+            {selectedElement.type !== 'divider' && selectedElement.type !== 'container' && (
               <div className="space-y-3 pt-2 border-t border-slate-800/60">
                 <div>
                   <label className="text-[11px] font-bold text-slate-400 uppercase tracking-wider block mb-1">
@@ -220,23 +252,25 @@ export const ElementInspector: React.FC<ElementInspectorProps> = ({
                   <input
                     type="text"
                     value={selectedElement.field || ''}
-                    placeholder="e.g. title, author, tag"
+                    placeholder="e.g. title, author, tag, code"
                     onChange={(e) => updateSelectedElement({ field: e.target.value })}
                     className="w-full bg-[#070a10] border border-slate-800 rounded px-2.5 py-1.5 text-xs text-slate-200 font-mono"
                   />
                 </div>
-                <div>
-                  <label className="text-[11px] font-bold text-slate-400 uppercase tracking-wider block mb-1">
-                    Default Fallback Value
-                  </label>
-                  <input
-                    type="text"
-                    value={selectedElement.default || ''}
-                    placeholder="Fallback text or URL"
-                    onChange={(e) => updateSelectedElement({ default: e.target.value })}
-                    className="w-full bg-[#070a10] border border-slate-800 rounded px-2.5 py-1.5 text-xs text-slate-200 font-mono"
-                  />
-                </div>
+                {selectedElement.type !== 'code' && (
+                  <div>
+                    <label className="text-[11px] font-bold text-slate-400 uppercase tracking-wider block mb-1">
+                      Default Value
+                    </label>
+                    <input
+                      type="text"
+                      value={selectedElement.default || ''}
+                      placeholder="Fallback text or value"
+                      onChange={(e) => updateSelectedElement({ default: e.target.value })}
+                      className="w-full bg-[#070a10] border border-slate-800 rounded px-2.5 py-1.5 text-xs text-slate-200 font-mono"
+                    />
+                  </div>
+                )}
               </div>
             )}
 
@@ -313,83 +347,117 @@ export const ElementInspector: React.FC<ElementInspectorProps> = ({
               </div>
             )}
 
-            {/* Badge specific */}
-            {selectedElement.type === 'badge' && (
+            {/* Code Snippet Controls */}
+            {selectedElement.type === 'code' && (
               <div className="space-y-3 pt-2 border-t border-slate-800/60">
                 <div>
                   <label className="text-[11px] font-bold text-slate-400 uppercase tracking-wider block mb-1">
-                    Background Color
+                    Language / Title
                   </label>
-                  <div className="flex items-center gap-2">
-                    <input
-                      type="color"
-                      value={selectedElement.background_color?.startsWith('#') ? selectedElement.background_color.slice(0, 7) : '#3b82f6'}
-                      onChange={(e) => updateSelectedElement({ background_color: e.target.value })}
-                      className="w-7 h-7 rounded border border-slate-700 bg-transparent cursor-pointer"
-                    />
-                    <input
-                      type="text"
-                      value={selectedElement.background_color || '#3b82f6'}
-                      onChange={(e) => updateSelectedElement({ background_color: e.target.value })}
-                      className="flex-1 bg-[#070a10] border border-slate-800 rounded px-2.5 py-1.5 text-xs text-slate-200 font-mono"
-                    />
-                  </div>
+                  <input
+                    type="text"
+                    value={selectedElement.language || 'go'}
+                    onChange={(e) => updateSelectedElement({ language: e.target.value })}
+                    className="w-full bg-[#070a10] border border-slate-800 rounded px-2.5 py-1.5 text-xs text-slate-200 font-mono"
+                  />
                 </div>
-
                 <div>
                   <label className="text-[11px] font-bold text-slate-400 uppercase tracking-wider block mb-1">
-                    Icon (optional)
+                    Snippet Code
                   </label>
-                  <select
-                    value={selectedElement.icon || ''}
-                    onChange={(e) => updateSelectedElement({ icon: e.target.value })}
-                    className="w-full bg-[#070a10] border border-slate-800 rounded px-2.5 py-1.5 text-xs text-slate-200 font-mono"
-                  >
-                    <option value="">None</option>
-                    <option value="github">GitHub</option>
-                    <option value="x">X / Twitter</option>
-                    <option value="clock">Clock</option>
-                    <option value="calendar">Calendar</option>
-                    <option value="star">Star</option>
-                    <option value="tag">Tag</option>
-                    <option value="bolt">Bolt</option>
-                    <option value="check">Check</option>
-                  </select>
+                  <textarea
+                    rows={6}
+                    value={selectedElement.default || ''}
+                    onChange={(e) => updateSelectedElement({ default: e.target.value })}
+                    className="w-full bg-[#070a10] border border-slate-800 rounded px-2.5 py-1.5 text-xs text-slate-200 font-mono leading-relaxed"
+                  />
+                </div>
+                <div className="grid grid-cols-2 gap-2">
+                  <label className="flex items-center gap-2 text-xs text-slate-300">
+                    <input
+                      type="checkbox"
+                      checked={selectedElement.show_controls !== false}
+                      onChange={(e) => updateSelectedElement({ show_controls: e.target.checked })}
+                      className="rounded bg-slate-900 border-slate-700 text-sky-500"
+                    />
+                    macOS Dots
+                  </label>
+                  <label className="flex items-center gap-2 text-xs text-slate-300">
+                    <input
+                      type="checkbox"
+                      checked={selectedElement.line_numbers !== false}
+                      onChange={(e) => updateSelectedElement({ line_numbers: e.target.checked })}
+                      className="rounded bg-slate-900 border-slate-700 text-sky-500"
+                    />
+                    Line Numbers
+                  </label>
                 </div>
               </div>
             )}
 
-            {/* Avatar specific */}
-            {selectedElement.type === 'avatar' && (
+            {/* Metric Controls */}
+            {selectedElement.type === 'metric' && (
               <div className="space-y-3 pt-2 border-t border-slate-800/60">
                 <div className="grid grid-cols-2 gap-2">
                   <div>
-                    <span className="text-[10px] text-slate-500 font-mono">Size (px)</span>
+                    <span className="text-[10px] text-slate-500 font-mono">Value</span>
                     <input
-                      type="number"
-                      value={selectedElement.size || 64}
-                      onChange={(e) => updateSelectedElement({ size: Number(e.target.value) })}
-                      className="w-full bg-[#070a10] border border-slate-800 rounded px-2.5 py-1.5 text-xs text-slate-200 font-mono"
+                      type="text"
+                      value={selectedElement.value || '14.2k'}
+                      onChange={(e) => updateSelectedElement({ value: e.target.value })}
+                      className="w-full bg-[#070a10] border border-slate-800 rounded px-2.5 py-1.5 text-xs text-slate-200 font-mono font-bold"
                     />
                   </div>
                   <div>
-                    <span className="text-[10px] text-slate-500 font-mono">Shape</span>
+                    <span className="text-[10px] text-slate-500 font-mono">Icon</span>
                     <select
-                      value={selectedElement.shape || 'circle'}
-                      onChange={(e) => updateSelectedElement({ shape: e.target.value as any })}
+                      value={selectedElement.icon || 'star'}
+                      onChange={(e) => updateSelectedElement({ icon: e.target.value })}
                       className="w-full bg-[#070a10] border border-slate-800 rounded px-2.5 py-1.5 text-xs text-slate-200 font-mono"
                     >
-                      <option value="circle">Circle</option>
-                      <option value="rounded">Rounded</option>
-                      <option value="square">Square</option>
+                      <option value="">None</option>
+                      <option value="star">Star</option>
+                      <option value="bolt">Bolt</option>
+                      <option value="eye">Eye</option>
+                      <option value="check">Check</option>
                     </select>
                   </div>
+                </div>
+
+                <div>
+                  <label className="text-[11px] font-bold text-slate-400 uppercase tracking-wider block mb-1">
+                    Subtext Label
+                  </label>
+                  <input
+                    type="text"
+                    value={selectedElement.subtext || 'GitHub Stars'}
+                    onChange={(e) => updateSelectedElement({ subtext: e.target.value })}
+                    className="w-full bg-[#070a10] border border-slate-800 rounded px-2.5 py-1.5 text-xs text-slate-200 font-mono"
+                  />
+                </div>
+
+                <div>
+                  <div className="flex items-center justify-between mb-1">
+                    <span className="text-[10px] text-slate-500 font-mono">Progress Bar Fill</span>
+                    <span className="text-[10px] text-sky-400 font-mono">
+                      {Math.round((selectedElement.progress || 0) * 100)}%
+                    </span>
+                  </div>
+                  <input
+                    type="range"
+                    min="0"
+                    max="1"
+                    step="0.05"
+                    value={selectedElement.progress || 0}
+                    onChange={(e) => updateSelectedElement({ progress: parseFloat(e.target.value) })}
+                    className="w-full"
+                  />
                 </div>
               </div>
             )}
           </>
         ) : (
-          /* Template Background Controls */
+          /* Template Background & Patterns */
           <div className="space-y-4">
             <div>
               <label className="text-[11px] font-bold text-slate-400 uppercase tracking-wider block mb-1">
@@ -414,37 +482,30 @@ export const ElementInspector: React.FC<ElementInspectorProps> = ({
               </select>
             </div>
 
-            {template.background.type === 'solid' && (
-              <div>
-                <label className="text-[11px] font-bold text-slate-400 uppercase tracking-wider block mb-1">
-                  Color
-                </label>
-                <div className="flex items-center gap-2">
-                  <input
-                    type="color"
-                    value={template.background.color || '#090d16'}
-                    onChange={(e) =>
-                      onUpdateTemplate({
-                        ...template,
-                        background: { ...template.background, color: e.target.value },
-                      })
-                    }
-                    className="w-7 h-7 rounded border border-slate-700 bg-transparent cursor-pointer"
-                  />
-                  <input
-                    type="text"
-                    value={template.background.color || '#090d16'}
-                    onChange={(e) =>
-                      onUpdateTemplate({
-                        ...template,
-                        background: { ...template.background, color: e.target.value },
-                      })
-                    }
-                    className="flex-1 bg-[#070a10] border border-slate-800 rounded px-2.5 py-1.5 text-xs text-slate-200 font-mono"
-                  />
-                </div>
-              </div>
-            )}
+            {/* Pattern Overlay Option */}
+            <div>
+              <label className="text-[11px] font-bold text-slate-400 uppercase tracking-wider block mb-1">
+                Vector Pattern Overlay
+              </label>
+              <select
+                value={template.background.pattern || 'none'}
+                onChange={(e) =>
+                  onUpdateTemplate({
+                    ...template,
+                    background: {
+                      ...template.background,
+                      pattern: e.target.value as any,
+                    },
+                  })
+                }
+                className="w-full bg-[#070a10] border border-slate-800 rounded px-2.5 py-1.5 text-xs text-slate-200 font-mono"
+              >
+                <option value="none">None (Smooth)</option>
+                <option value="dots">Dots Grid (Linear/Vercel)</option>
+                <option value="grid">Tech Grid Lines</option>
+                <option value="lines">Diagonal Pinstripes</option>
+              </select>
+            </div>
 
             {/* Quick Add Elements Palette */}
             <div className="pt-4 border-t border-slate-800">
@@ -467,6 +528,20 @@ export const ElementInspector: React.FC<ElementInspectorProps> = ({
                   + Badge
                 </button>
                 <button
+                  onClick={() => addElement('code')}
+                  className="flex items-center gap-2 p-2 rounded bg-slate-900 border border-slate-800 hover:border-slate-700 text-xs text-slate-200 transition"
+                >
+                  <Terminal size={13} className="text-rose-400" />
+                  + Code Block
+                </button>
+                <button
+                  onClick={() => addElement('metric')}
+                  className="flex items-center gap-2 p-2 rounded bg-slate-900 border border-slate-800 hover:border-slate-700 text-xs text-slate-200 transition"
+                >
+                  <BarChart2 size={13} className="text-amber-400" />
+                  + Metric Stat
+                </button>
+                <button
                   onClick={() => addElement('avatar')}
                   className="flex items-center gap-2 p-2 rounded bg-slate-900 border border-slate-800 hover:border-slate-700 text-xs text-slate-200 transition"
                 >
@@ -477,7 +552,7 @@ export const ElementInspector: React.FC<ElementInspectorProps> = ({
                   onClick={() => addElement('divider')}
                   className="flex items-center gap-2 p-2 rounded bg-slate-900 border border-slate-800 hover:border-slate-700 text-xs text-slate-200 transition"
                 >
-                  <Minus size={13} className="text-amber-400" />
+                  <Minus size={13} className="text-slate-400" />
                   + Divider
                 </button>
                 <button
@@ -485,7 +560,7 @@ export const ElementInspector: React.FC<ElementInspectorProps> = ({
                   className="flex items-center gap-2 p-2 rounded bg-slate-900 border border-slate-800 hover:border-slate-700 text-xs text-slate-200 transition col-span-2"
                 >
                   <Square size={13} className="text-blue-400" />
-                  + Card Container Frame
+                  + Card Frame Container
                 </button>
               </div>
             </div>
