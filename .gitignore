@@ -10,7 +10,7 @@ web/node_modules/
 
 # Runtime data & cache
 data/
-cache/
+/cache/
 *.log
 
 # OS & Editor
