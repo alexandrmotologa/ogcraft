@@ -8,6 +8,14 @@
 </p>
 
 <p align="center">
+  <a href="https://github.com/alexandrmotologa/ogcraft/actions/workflows/ci.yml"><img src="https://github.com/alexandrmotologa/ogcraft/actions/workflows/ci.yml/badge.svg" alt="CI" /></a>
+  <a href="https://github.com/alexandrmotologa/ogcraft/releases"><img src="https://img.shields.io/badge/version-v1.0.0-6366f1.svg?style=flat-square" alt="Version" /></a>
+  <a href="https://golang.org"><img src="https://img.shields.io/badge/go-1.23+-00ADD8.svg?style=flat-square" alt="Go Version" /></a>
+  <a href="https://react.dev"><img src="https://img.shields.io/badge/react-19-61DAFB.svg?style=flat-square" alt="React 19" /></a>
+  <a href="LICENSE"><img src="https://img.shields.io/badge/license-MIT-blue.svg?style=flat-square" alt="License" /></a>
+</p>
+
+<p align="center">
   <img src="docs/images/ogcraft_demo.gif?raw=true" alt="ogcraft Studio and Social Feed Simulator Demo" width="100%" />
 </p>
 

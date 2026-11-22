@@ -33,6 +33,17 @@ var (
 )
 
 func main() {
+	for _, arg := range os.Args[1:] {
+		if arg == "version" || arg == "--version" || arg == "-v" || arg == "-V" {
+			fmt.Printf("ogcraft v%s\n", Version)
+			return
+		}
+		if arg == "help" || arg == "--help" || arg == "-h" {
+			printUsage()
+			return
+		}
+	}
+
 	if len(os.Args) < 2 {
 		runServe(os.Args[1:])
 		return
@@ -48,10 +59,6 @@ func main() {
 		runRender(args)
 	case "batch":
 		runBatch(args)
-	case "version", "--version", "-v":
-		fmt.Printf("ogcraft v%s (Go SIMD vector engine, React 19 visual designer)\n", Version)
-	case "help", "--help", "-h":
-		printUsage()
 	default:
 		if strings.HasPrefix(command, "-") {
 			runServe(os.Args[1:])
